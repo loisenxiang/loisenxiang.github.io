@@ -163,7 +163,7 @@
     <div class="article-entry" itemprop="articleBody">
       
         <h2 id="内存分区"><a href="#内存分区" class="headerlink" title="内存分区"></a>内存分区</h2><p>如图</p>
-<p><img src="http://7xt51v.com2.z0.glb.clouddn.com/HeapAndStack-Memory.png?imageMogr2/thumbnail/800x600" alt=""></p>
+<p><img src="http://7xt51v.com2.z0.glb.clouddn.com/HeapAndStack-Memory.png" alt=""></p>
 <p>Text Segment：文本区也称代码区，通常指用来存放程序执行代码的一块内存区域，区域的大小在程序运行前就已确定，并且内存区域通常属于只读</p>
 <p>Data Segment：数据段包含静态的和全局的变量，并且这些变量初始值非0，每个进程都有他自己的数据区。比如：static修饰，const修饰，全局变量等</p>
 <p>Bss Segment：包含静态和全局的变量，但是这些变量的初值是0或者没有赋初值。执行之前默认都会赋值为0</p>
@@ -216,7 +216,7 @@ void myFunction()
 <li>堆中创建的内存区域需要自己释放，否则会有内存泄露，在程序退出时整个堆区会全部释放。</li>
 <li>不同线程可以同时访问同一堆内存块，所以堆区中需要对不同线程共同访问同一块内存做处理</li>
 </ol>
-<p><img src="http://7xt51v.com2.z0.glb.clouddn.com/HeapAndStackHeap.png?imageMogr2/thumbnail/400x300" alt=""></p>
+<p><img src="http://7xt51v.com2.z0.glb.clouddn.com/HeapAndStackHeap.png" alt=""></p>
 <p>###栈：</p>
 <ol>
 <li>目的：调度程序中函数的有序执行（下面会讲）</li>

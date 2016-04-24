@@ -55,9 +55,9 @@
       </nav>
       <nav id="sub-nav">
         
-          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="Flux RSS"></a>
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
         
-        <a id="nav-search-btn" class="nav-icon" title="Rechercher"></a>
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
       </nav>
       <div id="search-form-wrap">
         <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" results="0" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://yoursite.com"></form>
@@ -68,9 +68,159 @@
       <div class="outer">
         <section id="main">
   
-    <article id="post-codingPage" class="article article-type-post" itemscope itemprop="blogPost">
+    <article id="post-copy" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
-    <a href="/2016/04/18/codingPage/" class="article-date">
+    <a href="/2016/04/24/copy/" class="article-date">
+  <time datetime="2016-04-24T08:50:04.000Z" itemprop="datePublished">2016-04-24</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2016/04/24/copy/">copy剖析</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="copy与mutableCopy相关的内存管理"><a href="#copy与mutableCopy相关的内存管理" class="headerlink" title="copy与mutableCopy相关的内存管理"></a>copy与mutableCopy相关的内存管理</h2><p>不知道为什么一说这个，很多人都拿NSString和NSMutableString做测试，我想最直接的是因为常用又实现了copy和mutableCopy的代理，但是NSString类的其实比较特殊，不应该拿NSString来测试，所以本文拿实现代理的NSURLRequest来做测试。</p>
+<h4 id="immutableObject："><a href="#immutableObject：" class="headerlink" title="immutableObject："></a>immutableObject：</h4><h5 id="非集合的"><a href="#非集合的" class="headerlink" title="非集合的"></a>非集合的</h5><pre><code>NSURL *url = [[NSURL alloc] initWithString:@"ceshi"];
+NSURLRequest *urlRequest = [[NSURLRequest alloc] initWithURL:url];
+NSLog(@"urlReqeust:%@, urlRequestRec:%ld", urlRequest, [urlRequest retainCount]);  
+//log: urlReqeust:<nsurlrequest: 0x7fb763f11090=""> { URL: ceshi }, urlRequestRec:1
+
+NSURLRequest *urlRequest1 = [urlRequest copy];
+NSLog(@"urlRequest1:%@, urlRequest1:%ld", urlRequest1, [urlRequest1 retainCount]);
+// log: urlRequest1:<nsurlrequest: 0x7fb763f11090=""> { URL: ceshi }, urlRequest1:2</nsurlrequest:></nsurlrequest:></code></pre>
+
+<p>总结：immutableObject做copy时，做的是浅copy，也就是说只是所指向的对象的内存计数器增加了1，所以如果urlRequest1重新赋值时，需要做下release把之前所指的对象的内存计数器减1，否则就会有内存泄露。如下：</p>
+<pre><code>[urlRequest1 release], urlRequest1 = nil;
+// 此时urlRequest所指对象计数器为1，urlRequest1为nil
+urlRequest1 = [NSURLRequest requestWithURL:[NSURL URLWithString:@"ceshi2"]];
+// 此时urlRequest1指向新的对象，指向的对象的计数器为1</code></pre>
+
+<h5 id="集合的"><a href="#集合的" class="headerlink" title="集合的"></a>集合的</h5><pre><code>NSArray *array = @[@[@"a", @"b"], @[@"c", @"d"]];
+NSArray *copyArray = [array copy];
+NSMutableArray *mCopyArray = [array mutableCopy];
+// log: =====array:0x7fb2a8f0d2b0,arrayRec:2, =====copyArray:0x7fb2a8f0d2b0,copyArrayRec:2, ======mCopyArry:0x7fb2a8e10ef0, mCopyArrayRec:1
+
+// 有bug，必须要做copyArray的release    
+
+copyArray = @[@"a",@"d"];
+NSLog(@"array:%@,copyArr:%@,mCopyArray:%@", array, copyArray, mCopyArray);
+// log: =====array:0x7fb2a8f0d2b0,arrayRec:2, =====copyArray:0x7fb2a8f1b980,copyArrayRec:1, ======mCopyArry:0x7fb2a8e10ef0, mCopyArrayRec:1
+</code></pre>
+
+<p>与immutable的非集合一样，copy将直接增加指针指向对象的引用计数器(集合的话：各元素的指针计数器都增加了1)。所以在copyArray更改前，必须要做release，否则会有内存泄漏</p>
+<h4 id="mutableObject"><a href="#mutableObject" class="headerlink" title="mutableObject"></a>mutableObject</h4><h5 id="非集合的-1"><a href="#非集合的-1" class="headerlink" title="非集合的"></a>非集合的</h5><pre><code>    NSURL *url = [[NSURL alloc] initWithString:@"ceshi"];
+    NSURLRequest *urlRequest = [[NSURLRequest alloc] initWithURL:url];
+    NSLog(@"urlReqeust:%@, urlRequestRec:%ld\r", urlRequest, [urlRequest retainCount]);
+    // log: urlReqeust:<nsurlrequest: 0x7f98dac07e00=""> { URL: ceshi }, urlRequestRec:1
+
+    NSMutableURLRequest *mutableRequest = [urlRequest mutableCopy];
+    NSLog(@"mutableRequest:%@, mutableRequest:%ld", mutableRequest, [mutableRequest retainCount]);
+    // log:  mutableRequest:<nsmutableurlrequest: 0x7f98daf07390=""> { URL: ceshi }, mutableRequest:1
+
+    NSMutableURLRequest *mutableRequest1 = [mutableRequest mutableCopy];
+    NSLog(@"mutableRequest1:%@, mutableRequest1:%ld", mutableRequest1, [mutableRequest1 retainCount]);
+    // log: mutableRequest1:<nsmutableurlrequest: 0x7f98dac674f0=""> { URL: ceshi }, mutableRequest1:1
+</nsmutableurlrequest:></nsmutableurlrequest:></nsurlrequest:></code></pre>
+
+<h5 id="集合的-1"><a href="#集合的-1" class="headerlink" title="集合的"></a>集合的</h5><pre><code>
+NSMutableArray *array = [NSMutableArray arrayWithObjects:[NSMutableString stringWithString:@"a"],@"b",@"c",nil];
+NSArray *copyArray = [array copy];
+NSMutableArray *mCopyArray = [array mutableCopy];
+// log: =====array:0x7fbbd3d0d730,arrayRec:1, =====copyArray:0x7fbbd3d19610,copyArrayRec:1, ======mCopyArry:0x7fbbd3d18ad0, mCopyArrayRec:1
+</code></pre>
+
+<p>总结：mutableObject的复制是深复制，直接创建一个新的内存地址来复制其内容（在集合中把各个元素的内容都赋值了一遍）。 与之前的被复制项无任何关系。</p>
+<p>汇总：</p>
+<ul>
+<li>[immutableObject copy] // 浅复制</li>
+<li>[immutableObject mutableCopy] //深复制</li>
+<li>[mutableObject copy] //深复制</li>
+<li>[mutableObject mutableCopy] //深复制</li>
+</ul>
+<h2 id="特殊的NSString"><a href="#特殊的NSString" class="headerlink" title="特殊的NSString"></a>特殊的NSString</h2><pre><code>
+NSString *str1 = @"abc";
+NSString *str2 = @"abc";
+NSString *str3 = [[NSString alloc] initWithString:@"abc"];
+NSString *str4 = [str1 copy];
+NSString *str5 = [[NSString alloc] initWithString:@"abc"];
+NSString *str6 = [str1 mutableCopy];
+
+//输出内存中的地址
+NSLog(@"str1: %p", str1);
+NSLog(@"str2: %p", str2);
+NSLog(@"str3: %p", str3);
+NSLog(@"str4: %p", str4);
+NSLog(@"str5: %p", str5);
+NSLog(@"str6: %p", str6);
+</code></pre>
+
+<p>猜下结果：</p>
+<p>2016-04-24 22:41:50.629 TestCopy[2094:229125] str1: 0x1081af070<br>2016-04-24 22:41:50.630 TestCopy[2094:229125] str2: 0x1081af070<br>2016-04-24 22:41:50.630 TestCopy[2094:229125] str3: 0x1081af070<br>2016-04-24 22:41:50.630 TestCopy[2094:229125] str4: 0x1081af070<br>2016-04-24 22:41:50.630 TestCopy[2094:229125] str5: 0x1081af070<br>2016-04-24 22:41:50.631 TestCopy[2094:229125] str6: 0x7fb1d3f0ce70</p>
+<p>我的理解：<br>NSString在程序中使用非常大，所以在immutable的copy和mutableCopy的原理下，为了系统性能的考虑，增加了只要是NSString存在，则直接把字符串地址付给使用者即可。如果此时str2=@”abdt”了，则直接拿生成的abdt的地址赋值给str2即可。</p>
+<h4 id="NSMutableString与immutableObj类似"><a href="#NSMutableString与immutableObj类似" class="headerlink" title="NSMutableString与immutableObj类似"></a>NSMutableString与immutableObj类似</h4><pre><code>
+NSMutableString *str1 = [NSMutableString stringWithFormat:@"abc"];
+NSMutableString *str2 = [[NSMutableString alloc] initWithString:@"abc"];
+NSMutableString *str3 = [str1 copy];
+NSMutableString *str4 = [str1 mutableCopy];
+
+//输出内存中的地址
+NSLog(@"str1: %p, reC:%ld", str1, [str1 retainCount]);
+NSLog(@"str2: %p, reC:%ld", str2, [str2 retainCount]);
+NSLog(@"str3: %p", str3);
+NSLog(@"str4: %p", str4);
+</code></pre>
+
+<p>log:<br>2016-04-24 22:58:42.319 TestCopy[2164:240308] str1: 0x7fa7ebca0c50, reC:1<br>2016-04-24 22:58:42.319 TestCopy[2164:240308] str2: 0x7fa7ebca8560, reC:1<br>2016-04-24 22:58:42.319 TestCopy[2164:240308] str3: 0xa000000006362613<br>2016-04-24 22:58:42.320 TestCopy[2164:240308] str4: 0x7fa7ebca7ed0</p>
+<p>最后看2段代码：</p>
+<pre><code>
+//UserEntity.h
+@interface UserEntity : NSObject <nscopying>
+@property(strong, nonatomic) NSString *name;
+@end
+UserEntity *userEntity = [UserEntity new];
+//创建mutable类型的字符串
+NSMutableString *showName = [[NSMutableString alloc] initWithString:@"tutuge"];
+//先保存“tutuge”字符串到userEntity的name
+userEntity.name = showName;
+//修改showName
+[showName appendString:@" blog"];
+//输出userEntity的name属性
+NSLog(@"Name: %@", userEntity.name);
+</nscopying></code></pre>
+
+<p>输出为：tutuge blog </p>
+<p>如果更改为：@interface UserEntity : NSObject <nscopying><br>@property(copy, nonatomic) NSString *name;<br>@end</nscopying></p>
+<p>则输出为: tutuge</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cinepjpra0003plzx9b2zlw4j" class="article-share-link">Share</a>
+      
+      
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/copy/">copy</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-Block" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2016/04/18/Block/" class="article-date">
   <time datetime="2016-04-18T15:46:43.000Z" itemprop="datePublished">2016-04-18</time>
 </a>
     
@@ -82,7 +232,7 @@
         
   
     <h1 itemprop="name">
-      <a class="article-title" href="/2016/04/18/codingPage/">codingPage</a>
+      <a class="article-title" href="/2016/04/18/Block/">block详解</a>
     </h1>
   
 
@@ -90,13 +240,42 @@
     
     <div class="article-entry" itemprop="articleBody">
       
-        
+        <p>分两部分内容来剖析block：</p>
+<ol>
+<li>怎么用</li>
+<li>为什么这么用</li>
+</ol>
+<h2 id="block用法"><a href="#block用法" class="headerlink" title="block用法"></a>block用法</h2><h4 id="非Arc"><a href="#非Arc" class="headerlink" title="非Arc"></a>非Arc</h4><pre><code>typedef int (^square)(int);
+
+    square tempBlock1 = ^(int a){ return a * a; };
+
+    NSLog(@"tempBlock1:%@, return1:%d", tempBlock1, tempBlock1(5));
+    // log: tempBlock1:<__nsglobalblock__: 0x10e6d9240="">, return1:25
+
+    int i = 2;
+    square temptBlock2 = ^(int a){ int itRet = i * a; return itRet; };
+    NSLog(@"temptBlock2:%@, return2:%d", temptBlock2, temptBlock2(5));
+    // log: temptBlock2:<__nsstackblock__: 0x7fff51528a50="">, return2:10
+
+    square temptBlock3 = [temptBlock2 copy];
+    NSLog(@"temptBlock3:%@, return3:%d", temptBlock3, temptBlock3(5));
+    // log: temptBlock3:<__nsmallocblock__: 0x7fbdc0608180="">, return3:10
+    [temptBlock3 release];
+</__nsmallocblock__:></__nsstackblock__:></__nsglobalblock__:></code></pre>
+
+
+<p>分类：</p>
+<p>根据Block在内存中的位置分为三种类型NSGlobalBlock，NSStackBlock, NSMallocBlock。</p>
+<p>NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存，函数返回后Block将无效； NSMallocBlock：位于堆内存。需要开发者进行释放。</p>
+
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/codingPage/" data-id="cin74hk85000163zxqd1cxu3i" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/Block/" data-id="cinepjpr00000plzxpuv7h7dy" class="article-share-link">Share</a>
       
       
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/block/">block</a></li></ul>
+
     </footer>
   </div>
   
@@ -443,7 +622,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/TextAndImage/" data-id="cin7is1is0000ppzxyhgpgbsw" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/TextAndImage/" data-id="cinepjprc0004plzx9n05mktp" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li></ul>
@@ -601,7 +780,7 @@ void myFunction()
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/HeapAndStack/" data-id="cin74hk80000063zxyk56gb5w" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/HeapAndStack/" data-id="cinepjpr50001plzx3rtwmlto" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
@@ -649,7 +828,7 @@ void myFunction()
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/hello-world/" data-id="cin74hk87000263zx8sxi9m4j" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/hello-world/" data-id="cinepjpre0006plzxalqckwl3" class="article-share-link">Share</a>
       
       
     </footer>
@@ -669,9 +848,9 @@ void myFunction()
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Mot-clés</h3>
+    <h3 class="widget-title">Tags</h3>
     <div class="widget">
-      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/block/">block</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/copy/">copy</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
     </div>
   </div>
 
@@ -679,9 +858,9 @@ void myFunction()
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Nuage de mot-clés</h3>
+    <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
-      <a href="/tags/NSMutableAttributedString/" style="font-size: 10px;">NSMutableAttributedString</a> <a href="/tags/堆栈/" style="font-size: 10px;">堆栈</a>
+      <a href="/tags/NSMutableAttributedString/" style="font-size: 10px;">NSMutableAttributedString</a> <a href="/tags/block/" style="font-size: 10px;">block</a> <a href="/tags/copy/" style="font-size: 10px;">copy</a> <a href="/tags/堆栈/" style="font-size: 10px;">堆栈</a>
     </div>
   </div>
 
@@ -698,12 +877,16 @@ void myFunction()
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Articles récents</h3>
+    <h3 class="widget-title">Recent Posts</h3>
     <div class="widget">
       <ul>
         
           <li>
-            <a href="/2016/04/18/codingPage/">codingPage</a>
+            <a href="/2016/04/24/copy/">copy剖析</a>
+          </li>
+        
+          <li>
+            <a href="/2016/04/18/Block/">block详解</a>
           </li>
         
           <li>
@@ -731,7 +914,7 @@ void myFunction()
   <div class="outer">
     <div id="footer-info" class="inner">
       &copy; 2016 Xiang<br>
-      Propulsé by <a href="http://hexo.io/" target="_blank">Hexo</a>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
     </div>
   </div>
 </footer>

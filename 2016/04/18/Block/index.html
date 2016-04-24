@@ -3,17 +3,48 @@
 <head>
   <meta charset="utf-8">
   
-  <title>Archives | 孙翔的技术博客</title>
+  <title>block详解 | 孙翔的技术博客</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description">
-<meta property="og:type" content="website">
-<meta property="og:title" content="孙翔的技术博客">
-<meta property="og:url" content="http://yoursite.com/archives/index.html">
+  <meta name="description" content="分两部分内容来剖析block：
+
+怎么用
+为什么这么用
+
+block用法非Arctypedef int (^square)(int);
+
+    square tempBlock1 = ^(int a){ return a * a; };
+
+    NSLog(@&quot;tempBlock1:%@, return1:%d&quot;, tempBlock1, tempBlock1(5));
+    // log:">
+<meta property="og:type" content="article">
+<meta property="og:title" content="block详解">
+<meta property="og:url" content="http://yoursite.com/2016/04/18/Block/index.html">
 <meta property="og:site_name" content="孙翔的技术博客">
-<meta property="og:description">
+<meta property="og:description" content="分两部分内容来剖析block：
+
+怎么用
+为什么这么用
+
+block用法非Arctypedef int (^square)(int);
+
+    square tempBlock1 = ^(int a){ return a * a; };
+
+    NSLog(@&quot;tempBlock1:%@, return1:%d&quot;, tempBlock1, tempBlock1(5));
+    // log:">
+<meta property="og:updated_time" content="2016-04-24T07:45:19.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="孙翔的技术博客">
-<meta name="twitter:description">
+<meta name="twitter:title" content="block详解">
+<meta name="twitter:description" content="分两部分内容来剖析block：
+
+怎么用
+为什么这么用
+
+block用法非Arctypedef int (^square)(int);
+
+    square tempBlock1 = ^(int a){ return a * a; };
+
+    NSLog(@&quot;tempBlock1:%@, return1:%d&quot;, tempBlock1, tempBlock1(5));
+    // log:">
   
     <link rel="alternate" href="/atom.xml" title="孙翔的技术博客" type="application/atom+xml">
   
@@ -66,115 +97,89 @@
   </div>
 </header>
       <div class="outer">
-        <section id="main">
-  
-  
-    
-    
-      
-      
-      <section class="archives-wrap">
-        <div class="archive-year-wrap">
-          <a href="/archives/2016" class="archive-year">2016</a>
-        </div>
-        <div class="archives">
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      <a href="/2016/04/24/copy/" class="archive-article-date">
-  <time datetime="2016-04-24T08:50:04.000Z" itemprop="datePublished">Apr 24</time>
+        <section id="main"><article id="post-Block" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2016/04/18/Block/" class="article-date">
+  <time datetime="2016-04-18T15:46:43.000Z" itemprop="datePublished">2016-04-18</time>
 </a>
-      
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
   
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2016/04/24/copy/">copy剖析</a>
+    <h1 class="article-title" itemprop="name">
+      block详解
     </h1>
   
 
-    </header>
-  </div>
-</article>
-  
+      </header>
     
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      <a href="/2016/04/18/Block/" class="archive-article-date">
-  <time datetime="2016-04-18T15:46:43.000Z" itemprop="datePublished">Apr 18</time>
-</a>
+    <div class="article-entry" itemprop="articleBody">
       
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2016/04/18/Block/">block详解</a>
-    </h1>
-  
+        <p>分两部分内容来剖析block：</p>
+<ol>
+<li>怎么用</li>
+<li>为什么这么用</li>
+</ol>
+<h2 id="block用法"><a href="#block用法" class="headerlink" title="block用法"></a>block用法</h2><h4 id="非Arc"><a href="#非Arc" class="headerlink" title="非Arc"></a>非Arc</h4><pre><code>typedef int (^square)(int);
 
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      <a href="/2016/04/18/TextAndImage/" class="archive-article-date">
-  <time datetime="2016-04-18T08:36:28.000Z" itemprop="datePublished">Apr 18</time>
-</a>
+    square tempBlock1 = ^(int a){ return a * a; };
+
+    NSLog(@"tempBlock1:%@, return1:%d", tempBlock1, tempBlock1(5));
+    // log: tempBlock1:<__nsglobalblock__: 0x10e6d9240="">, return1:25
+
+    int i = 2;
+    square temptBlock2 = ^(int a){ int itRet = i * a; return itRet; };
+    NSLog(@"temptBlock2:%@, return2:%d", temptBlock2, temptBlock2(5));
+    // log: temptBlock2:<__nsstackblock__: 0x7fff51528a50="">, return2:10
+
+    square temptBlock3 = [temptBlock2 copy];
+    NSLog(@"temptBlock3:%@, return3:%d", temptBlock3, temptBlock3(5));
+    // log: temptBlock3:<__nsmallocblock__: 0x7fbdc0608180="">, return3:10
+    [temptBlock3 release];
+</__nsmallocblock__:></__nsstackblock__:></__nsglobalblock__:></code></pre>
+
+
+<p>分类：</p>
+<p>根据Block在内存中的位置分为三种类型NSGlobalBlock，NSStackBlock, NSMallocBlock。</p>
+<p>NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存，函数返回后Block将无效； NSMallocBlock：位于堆内存。需要开发者进行释放。</p>
+
       
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2016/04/18/TextAndImage/">文字和图片混排</a>
-    </h1>
-  
-
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      <a href="/2016/04/18/HeapAndStack/" class="archive-article-date">
-  <time datetime="2016-04-18T07:56:07.000Z" itemprop="datePublished">Apr 18</time>
-</a>
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2016/04/18/Block/" data-id="cinepjpr00000plzxpuv7h7dy" class="article-share-link">Share</a>
       
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2016/04/18/HeapAndStack/">深度剖析堆栈</a>
-    </h1>
-  
-
-    </header>
-  </div>
-</article>
-  
-    
-    
-    <article class="archive-article archive-type-post">
-  <div class="archive-article-inner">
-    <header class="archive-article-header">
-      <a href="/2016/04/18/hello-world/" class="archive-article-date">
-  <time datetime="2016-04-18T06:38:33.000Z" itemprop="datePublished">Apr 18</time>
-</a>
       
-  
-    <h1 itemprop="name">
-      <a class="archive-article-title" href="/2016/04/18/hello-world/">Hello World</a>
-    </h1>
-  
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/block/">block</a></li></ul>
 
-    </header>
+    </footer>
   </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/2016/04/24/copy/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          copy剖析
+        
+      </div>
+    </a>
+  
+  
+    <a href="/2016/04/18/TextAndImage/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">文字和图片混排</div>
+    </a>
+  
+</nav>
+
+  
 </article>
-  
-  
-    </div></section>
-  
 
 </section>
         

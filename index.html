@@ -55,9 +55,9 @@
       </nav>
       <nav id="sub-nav">
         
-          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="Flux RSS"></a>
         
-        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+        <a id="nav-search-btn" class="nav-icon" title="Rechercher"></a>
       </nav>
       <div id="search-form-wrap">
         <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" results="0" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://yoursite.com"></form>
@@ -82,7 +82,7 @@
         
   
     <h1 itemprop="name">
-      <a class="article-title" href="/2016/04/24/copy/">copy剖析</a>
+      <a class="article-title" href="/2016/04/24/copy/">copy与mutableCopy的内存管理剖析</a>
     </h1>
   
 
@@ -206,7 +206,7 @@ NSLog(@"Name: %@", userEntity.name);
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cinepjpra0003plzx9b2zlw4j" class="article-share-link">Share</a>
+      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cinepjpra0003plzx9b2zlw4j" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/copy/">copy</a></li></ul>
@@ -245,7 +245,19 @@ NSLog(@"Name: %@", userEntity.name);
 <li>怎么用</li>
 <li>为什么这么用</li>
 </ol>
-<h2 id="block用法"><a href="#block用法" class="headerlink" title="block用法"></a>block用法</h2><h4 id="非Arc"><a href="#非Arc" class="headerlink" title="非Arc"></a>非Arc</h4><pre><code>typedef int (^square)(int);
+<h2 id="block用法"><a href="#block用法" class="headerlink" title="block用法"></a>block用法</h2><p>分类：</p>
+<p>根据Block在内存中的位置分为三种类型NSGlobalBlock，NSStackBlock, NSMallocBlock。</p>
+<p>NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存，函数返回后Block将无效； NSMallocBlock：位于堆内存。需要开发者进行释放。<br>区分：非ARC下，无引用外部变量的即为NSGlobalBlock，引用外部变量的为NSStackBlock，NSStakBlock做copy即为NSMallocBlock。<br>内存管理：</p>
+<p>block是编译时生成的，而不是运行时生成的。所以在编译时如果用到外部变量就会把变量建一份快照放到栈上。</p>
+<ul>
+<li>NSGlobalBlock：生命周期从应用程序开始到程序终止。对其做retain/release/copy都没有任何意义，还是返回本身。</li>
+<li>NSStackBlock：函数返回后即消失。对其做retain/release都没有任何意义，还是返回本身。对其做copy则会把内容复制到堆内存(NSMallocBlock)，生成新的内存块。</li>
+<li>NSMallocBlock：需要程序员自己释放，对其做retain和copy一样，只是所指对象计数器增加1，打印时一直会显示1，但实际计数器已经增加了。对其做release计数器减一，不过打印计数器时，一直还是显示1。</li>
+</ul>
+<pre><code>typedef int (^square)(int);
+- (void) viewDidLoad
+{
+    [super viewDidLoad];
 
     square tempBlock1 = ^(int a){ return a * a; };
 
@@ -260,18 +272,29 @@ NSLog(@"Name: %@", userEntity.name);
     square temptBlock3 = [temptBlock2 copy];
     NSLog(@"temptBlock3:%@, return3:%d", temptBlock3, temptBlock3(5));
     // log: temptBlock3:<__nsmallocblock__: 0x7fbdc0608180="">, return3:10
-    [temptBlock3 release];
-</__nsmallocblock__:></__nsstackblock__:></__nsglobalblock__:></code></pre>
+
+    temptBlock = [temptBlock3 copy];
+    NSLog(@"temptBlock:%@, return:%d", temptBlock, temptBlock(5));
+    // log: temptBlock:<__nsmallocblock__: 0x7fbdc0608180="">, return3:10  此时temptBlock的计数器实际上是2
+
+    [temptBlock release];
+ }
+
+- (IBAction)Test:(id)sender {
+    NSLog(@"=====temptBlock:%@, return:%d, blockRec:%ld", temptBlock, temptBlock(5), [temptBlock retainCount]);
+
+    // 如果viewDidLoad中temptBlock再做次release就crash了 这里
+}
+</__nsmallocblock__:></__nsmallocblock__:></__nsstackblock__:></__nsglobalblock__:></code></pre>
 
 
-<p>分类：</p>
-<p>根据Block在内存中的位置分为三种类型NSGlobalBlock，NSStackBlock, NSMallocBlock。</p>
-<p>NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存，函数返回后Block将无效； NSMallocBlock：位于堆内存。需要开发者进行释放。</p>
+
+
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/Block/" data-id="cinepjpr00000plzxpuv7h7dy" class="article-share-link">Share</a>
+      <a data-url="http://yoursite.com/2016/04/18/Block/" data-id="cinepjpr00000plzxpuv7h7dy" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/block/">block</a></li></ul>
@@ -622,7 +645,7 @@ NSLog(@"Name: %@", userEntity.name);
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/TextAndImage/" data-id="cinepjprc0004plzx9n05mktp" class="article-share-link">Share</a>
+      <a data-url="http://yoursite.com/2016/04/18/TextAndImage/" data-id="cinepjprc0004plzx9n05mktp" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li></ul>
@@ -780,7 +803,7 @@ void myFunction()
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/HeapAndStack/" data-id="cinepjpr50001plzx3rtwmlto" class="article-share-link">Share</a>
+      <a data-url="http://yoursite.com/2016/04/18/HeapAndStack/" data-id="cinepjpr50001plzx3rtwmlto" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
@@ -828,7 +851,7 @@ void myFunction()
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/hello-world/" data-id="cinepjpre0006plzxalqckwl3" class="article-share-link">Share</a>
+      <a data-url="http://yoursite.com/2016/04/18/hello-world/" data-id="cinepjpre0006plzxalqckwl3" class="article-share-link">Partager</a>
       
       
     </footer>
@@ -848,7 +871,7 @@ void myFunction()
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Tags</h3>
+    <h3 class="widget-title">Mot-clés</h3>
     <div class="widget">
       <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/block/">block</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/copy/">copy</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
     </div>
@@ -858,7 +881,7 @@ void myFunction()
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Tag Cloud</h3>
+    <h3 class="widget-title">Nuage de mot-clés</h3>
     <div class="widget tagcloud">
       <a href="/tags/NSMutableAttributedString/" style="font-size: 10px;">NSMutableAttributedString</a> <a href="/tags/block/" style="font-size: 10px;">block</a> <a href="/tags/copy/" style="font-size: 10px;">copy</a> <a href="/tags/堆栈/" style="font-size: 10px;">堆栈</a>
     </div>
@@ -877,12 +900,12 @@ void myFunction()
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Recent Posts</h3>
+    <h3 class="widget-title">Articles récents</h3>
     <div class="widget">
       <ul>
         
           <li>
-            <a href="/2016/04/24/copy/">copy剖析</a>
+            <a href="/2016/04/24/copy/">copy与mutableCopy的内存管理剖析</a>
           </li>
         
           <li>
@@ -914,7 +937,7 @@ void myFunction()
   <div class="outer">
     <div id="footer-info" class="inner">
       &copy; 2016 Xiang<br>
-      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+      Propulsé by <a href="http://hexo.io/" target="_blank">Hexo</a>
     </div>
   </div>
 </footer>

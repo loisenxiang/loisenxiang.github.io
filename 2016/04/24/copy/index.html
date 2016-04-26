@@ -3,19 +3,19 @@
 <head>
   <meta charset="utf-8">
   
-  <title>copy剖析 | 孙翔的技术博客</title>
+  <title>copy与mutableCopy的内存管理剖析 | 孙翔的技术博客</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="description" content="copy与mutableCopy相关的内存管理不知道为什么一说这个，很多人都拿NSString和NSMutableString做测试，我想最直接的是因为常用又实现了copy和mutableCopy的代理，但是NSString类的其实比较特殊，不应该拿NSString来测试，所以本文拿实现代理的NSURLRequest来做测试。
 immutableObject：非集合的NSURL *url = [[">
 <meta property="og:type" content="article">
-<meta property="og:title" content="copy剖析">
+<meta property="og:title" content="copy与mutableCopy的内存管理剖析">
 <meta property="og:url" content="http://yoursite.com/2016/04/24/copy/index.html">
 <meta property="og:site_name" content="孙翔的技术博客">
 <meta property="og:description" content="copy与mutableCopy相关的内存管理不知道为什么一说这个，很多人都拿NSString和NSMutableString做测试，我想最直接的是因为常用又实现了copy和mutableCopy的代理，但是NSString类的其实比较特殊，不应该拿NSString来测试，所以本文拿实现代理的NSURLRequest来做测试。
 immutableObject：非集合的NSURL *url = [[">
-<meta property="og:updated_time" content="2016-04-24T15:03:20.000Z">
+<meta property="og:updated_time" content="2016-04-25T02:42:30.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="copy剖析">
+<meta name="twitter:title" content="copy与mutableCopy的内存管理剖析">
 <meta name="twitter:description" content="copy与mutableCopy相关的内存管理不知道为什么一说这个，很多人都拿NSString和NSMutableString做测试，我想最直接的是因为常用又实现了copy和mutableCopy的代理，但是NSString类的其实比较特殊，不应该拿NSString来测试，所以本文拿实现代理的NSURLRequest来做测试。
 immutableObject：非集合的NSURL *url = [[">
   
@@ -59,9 +59,9 @@ immutableObject：非集合的NSURL *url = [[">
       </nav>
       <nav id="sub-nav">
         
-          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="Flux RSS"></a>
         
-        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+        <a id="nav-search-btn" class="nav-icon" title="Rechercher"></a>
       </nav>
       <div id="search-form-wrap">
         <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" results="0" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://yoursite.com"></form>
@@ -84,7 +84,7 @@ immutableObject：非集合的NSURL *url = [[">
         
   
     <h1 class="article-title" itemprop="name">
-      copy剖析
+      copy与mutableCopy的内存管理剖析
     </h1>
   
 
@@ -208,7 +208,7 @@ NSLog(@"Name: %@", userEntity.name);
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cinepjpra0003plzx9b2zlw4j" class="article-share-link">Share</a>
+      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cinepjpra0003plzx9b2zlw4j" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/copy/">copy</a></li></ul>
@@ -221,7 +221,7 @@ NSLog(@"Name: %@", userEntity.name);
   
   
     <a href="/2016/04/18/Block/" id="article-nav-older" class="article-nav-link-wrap">
-      <strong class="article-nav-caption">Older</strong>
+      <strong class="article-nav-caption">Ancien</strong>
       <div class="article-nav-title">block详解</div>
     </a>
   
@@ -239,7 +239,7 @@ NSLog(@"Name: %@", userEntity.name);
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Tags</h3>
+    <h3 class="widget-title">Mot-clés</h3>
     <div class="widget">
       <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/block/">block</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/copy/">copy</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
     </div>
@@ -249,7 +249,7 @@ NSLog(@"Name: %@", userEntity.name);
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Tag Cloud</h3>
+    <h3 class="widget-title">Nuage de mot-clés</h3>
     <div class="widget tagcloud">
       <a href="/tags/NSMutableAttributedString/" style="font-size: 10px;">NSMutableAttributedString</a> <a href="/tags/block/" style="font-size: 10px;">block</a> <a href="/tags/copy/" style="font-size: 10px;">copy</a> <a href="/tags/堆栈/" style="font-size: 10px;">堆栈</a>
     </div>
@@ -268,12 +268,12 @@ NSLog(@"Name: %@", userEntity.name);
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Recent Posts</h3>
+    <h3 class="widget-title">Articles récents</h3>
     <div class="widget">
       <ul>
         
           <li>
-            <a href="/2016/04/24/copy/">copy剖析</a>
+            <a href="/2016/04/24/copy/">copy与mutableCopy的内存管理剖析</a>
           </li>
         
           <li>
@@ -305,7 +305,7 @@ NSLog(@"Name: %@", userEntity.name);
   <div class="outer">
     <div id="footer-info" class="inner">
       &copy; 2016 Xiang<br>
-      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+      Propulsé by <a href="http://hexo.io/" target="_blank">Hexo</a>
     </div>
   </div>
 </footer>

@@ -55,9 +55,9 @@
       </nav>
       <nav id="sub-nav">
         
-          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="Flux RSS"></a>
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
         
-        <a id="nav-search-btn" class="nav-icon" title="Rechercher"></a>
+        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
       </nav>
       <div id="search-form-wrap">
         <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" results="0" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://yoursite.com"></form>
@@ -206,7 +206,7 @@ NSLog(@"Name: %@", userEntity.name);
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cinepjpra0003plzx9b2zlw4j" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cinepjpra0003plzx9b2zlw4j" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/copy/">copy</a></li></ul>
@@ -288,13 +288,233 @@ NSLog(@"Name: %@", userEntity.name);
 </__nsmallocblock__:></__nsmallocblock__:></__nsstackblock__:></__nsglobalblock__:></code></pre>
 
 
+<h2 id="修改变量值原理"><a href="#修改变量值原理" class="headerlink" title="修改变量值原理"></a>修改变量值原理</h2><pre><code>typedef int (^square)(int);
 
+int i = 6;
+square tempBlock1 = ^(int a){return a * i; };
+
+printf("=====%d", tempBlock1(5));</code></pre>
+
+<p>如果想在tempBlock1中更改i值是不被允许的，为什么？查看代码的底层实现:clang -rewrite-objc block2.c，去掉不必要的代码，保留主要代码：</p>
+<pre><code>struct __block_impl {
+  void *isa;
+  int Flags;
+  int Reserved;
+  void *FuncPtr;
+};
+
+
+struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  int i;
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, int _i, int flags=0) : i(_i) {
+    impl.isa = &_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+
+
+static int __main_block_func_0(struct __main_block_impl_0 *__cself, int a) {
+  int i = __cself->i; // bound by copy
+return a * i; }
+
+
+static struct __main_block_desc_0 {
+  size_t reserved;
+  size_t Block_size;
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0)};
+
+
+int main()
+{
+    int i = 6;
+    square tempBlock1 = ((int (*)(int))&__main_block_impl_0((void *)__main_block_func_0, &__main_block_desc_0_DATA, i));
+
+    printf("=====%d", ((int (*)(__block_impl *, int))((__block_impl *)tempBlock1)->FuncPtr)((__block_impl *)tempBlock1, 5));
+
+    return 0;
+}</code></pre>
+
+<p>代码看上去有些多，看主要信息：</p>
+<ol>
+<li><strong>block_impl：isa指名是一个对象，指向所属类的指针也就是保存了block的类型（这里为栈对象），flags记录block的标识，reserved：保留字段为了扩展，funcptr：block执行的函数体，也就是block的实现。</strong>main_block_impl_0：包含<strong>block_impl对象和</strong>main_block_desc_0（就是记录<strong>main_block_impl_0的大小），以及外部变量的映像。个人理解其实</strong>block_impl就是__main_block_impl_0的基类。</li>
+<li>顺序：创建tempBlock1对象，执行block的函数体。</li>
+<li>为什么不能在block中直接更改变量值，因为传的只是形参，如果改变的话只能操作tempBlock1中的i的改变，但是外部的变量i是不会被改变的，所以干脆禁止这么操作。那么怎么改才能和外部的联动？</li>
+</ol>
+<pre><code>{
+    __block int i = 6;
+    square tempBlock1 = ^(int a){ i = i + 1; return a * i; };
+
+    i = 7;
+
+    printf("=====%d,i=%d", tempBlock1(5), i);
+
+    return 0;
+}</code></pre>
+
+<p>同样查看源码，去掉不必要的代码：</p>
+<pre><code>struct __block_impl {
+  void *isa;
+  int Flags;
+  int Reserved;
+  void *FuncPtr;
+};
+
+
+struct __Block_byref_i_0 {
+  void *__isa;
+__Block_byref_i_0 *__forwarding;
+ int __flags;
+ int __size;
+ int i;
+};
+
+
+struct __main_block_impl_0 {
+  struct __block_impl impl;
+  struct __main_block_desc_0* Desc;
+  __Block_byref_i_0 *i; // by ref
+  __main_block_impl_0(void *fp, struct __main_block_desc_0 *desc, __Block_byref_i_0 *_i, int flags=0) : i(_i->__forwarding) {
+    impl.isa = &_NSConcreteStackBlock;
+    impl.Flags = flags;
+    impl.FuncPtr = fp;
+    Desc = desc;
+  }
+};
+
+
+static int __main_block_func_0(struct __main_block_impl_0 *__cself, int a) {
+  __Block_byref_i_0 *i = __cself->i; // bound by ref
+ (i->__forwarding->i) = (i->__forwarding->i) + 1; return a * (i->__forwarding->i); }
+
+
+static void __main_block_copy_0(struct __main_block_impl_0*dst, struct __main_block_impl_0*src) {_Block_object_assign((void*)&dst->i, (void*)src->i, 8/*BLOCK_FIELD_IS_BYREF*/);}
+
+
+static void __main_block_dispose_0(struct __main_block_impl_0*src) {_Block_object_dispose((void*)src->i, 8/*BLOCK_FIELD_IS_BYREF*/);}
+
+
+static struct __main_block_desc_0 {
+  size_t reserved;
+  size_t Block_size;
+  void (*copy)(struct __main_block_impl_0*, struct __main_block_impl_0*);
+  void (*dispose)(struct __main_block_impl_0*);
+} __main_block_desc_0_DATA = { 0, sizeof(struct __main_block_impl_0), __main_block_copy_0, __main_block_dispose_0};
+
+
+int main()
+{
+    __attribute__((__blocks__(byref))) __Block_byref_i_0 i = {(void*)0,(__Block_byref_i_0 *)&i, 0, sizeof(__Block_byref_i_0), 6};
+    square tempBlock1 = ((int (*)(int))&__main_block_impl_0((void *)__main_block_func_0, &__main_block_desc_0_DATA, (__Block_byref_i_0 *)&i, 570425344));
+
+    (i.__forwarding->i) = 7;
+
+    printf("=====%d,i=%d", ((int (*)(__block_impl *, int))((__block_impl *)tempBlock1)->FuncPtr)((__block_impl *)tempBlock1, 5), (i.__forwarding->i));
+
+    return 0;
+}</code></pre>
+
+
+<p>只看不同的代码：</p>
+<ol>
+<li>多了个<strong>Block_byref_i_0：生成</strong>Block_byref_i_0对象i存储外部变量的值，这样把<strong>Block_byref_i_0对象i的指针传入block中，在栈函数funptr中直接改变</strong>Block_byref_i_0对象i中int变量i的值，因为block外部和内部都用的是同一个对象指针，所以在block内外改变其中的值是联动的即同一份。</li>
+<li>多了个<strong>main_block_copy_0：如果block从栈中复制到堆中时，会调用此函数，里面的实现就是把</strong>Block_byref_i_0对象i栈的i-&gt;forwarding指向__Block_byref_i_0堆中的地址。这样堆中操作了，栈中也会联动改变。也是forwarding的作用（代码实现在下面）。</li>
+<li>__main_block_dispose_0：在block释放时会调用此函数。</li>
+</ol>
+<p>具体源码查看苹果blockRuntime里面的这些实现的源码，<a href="http://opensource.apple.com/source/clang/clang-137/src/projects/compiler-rt/BlocksRuntime/runtime.c" target="_blank" rel="external">网址点击这里</a>:</p>
+<pre><code>
+void _Block_object_assign(void *destAddr, const void *object, const int flags)
+{
+    //printf("_Block_object_assign(*%p, %p, %x)\n", destAddr, object, flags);
+    if ((flags & BLOCK_BYREF_CALLER) == BLOCK_BYREF_CALLER)
+    {
+        if ((flags & BLOCK_FIELD_IS_WEAK) == BLOCK_FIELD_IS_WEAK)
+        {
+            _Block_assign_weak(object, destAddr);
+        }
+        else
+        {
+            // do *not* retain or *copy* __block variables whatever they are
+            _Block_assign((void *)object, destAddr);
+        }
+    }
+    else if ((flags & BLOCK_FIELD_IS_BYREF) == BLOCK_FIELD_IS_BYREF)
+    {
+        // copying a __block reference from the stack Block to the heap
+        // flags will indicate if it holds a __weak reference and needs a special isa
+        _Block_byref_assign_copy(destAddr, object, flags);
+    }
+    // (this test must be before next one)
+    else if ((flags & BLOCK_FIELD_IS_BLOCK) == BLOCK_FIELD_IS_BLOCK)
+    {
+        // copying a Block declared variable from the stack Block to the heap
+        _Block_assign(_Block_copy_internal(object, flags), destAddr);
+    }
+    // (this test must be after previous one)
+    else if ((flags & BLOCK_FIELD_IS_OBJECT) == BLOCK_FIELD_IS_OBJECT)
+    {
+        //printf("retaining object at %p\n", object);
+        _Block_retain_object(object);
+        //printf("done retaining object at %p\n", object);
+        _Block_assign((void *)object, destAddr);
+    }
+}
+
+
+static void _Block_byref_assign_copy(void *dest, const void *arg, const int flags)
+{
+    struct Block_byref **destp = (struct Block_byref **)dest;
+    struct Block_byref *src = (struct Block_byref *)arg;
+    if (src->forwarding->flags & BLOCK_IS_GC)
+    {
+        ;   // don't need to do any more work
+    }
+    else if ((src->forwarding->flags & BLOCK_REFCOUNT_MASK) == 0)
+    {
+        //printf("making copy\n");
+        // src points to stack
+        bool isWeak = ((flags & (BLOCK_FIELD_IS_BYREF|BLOCK_FIELD_IS_WEAK)) == (BLOCK_FIELD_IS_BYREF|BLOCK_FIELD_IS_WEAK));
+        // if its weak ask for an object (only matters under GC)
+        struct Block_byref *copy = (struct Block_byref *)_Block_allocator(src->size, false, isWeak);
+        copy->flags = src->flags | _Byref_flag_initial_value; // non-GC one for caller, one for stack
+        copy->forwarding = copy; // patch heap copy to point to itself (skip write-barrier)
+        src->forwarding = copy;  // patch stack to point to heap copy
+        copy->size = src->size;
+        if (isWeak) {
+            copy->isa = &_NSConcreteWeakBlockVariable;  // mark isa field so it gets weak scanning
+        }
+        if (src->flags & BLOCK_HAS_COPY_DISPOSE) {
+            // Trust copy helper to copy everything of interest
+            // If more than one field shows up in a byref block this is wrong XXX
+            copy->byref_keep = src->byref_keep;
+            copy->byref_destroy = src->byref_destroy;
+            (*src->byref_keep)(copy, src);
+        }
+        else {
+            // just bits.  Blast 'em using _Block_memmove in case they're __strong
+            _Block_memmove(
+                           (void *)&copy->byref_keep,
+                           (void *)&src->byref_keep,
+                           src->size - sizeof(struct Block_byref_header));
+        }
+    }
+    // already copied to heap
+    else if ((src->forwarding->flags & BLOCK_NEEDS_FREE) == BLOCK_NEEDS_FREE) {
+        latching_incr_int(&src->forwarding->flags);
+    }
+    // assign byref data block pointer into new Block
+    _Block_assign(src->forwarding, (void **)destp);
+}
+</code></pre>
 
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/Block/" data-id="cinepjpr00000plzxpuv7h7dy" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/Block/" data-id="cinepjpr00000plzxpuv7h7dy" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/block/">block</a></li></ul>
@@ -645,7 +865,7 @@ NSLog(@"Name: %@", userEntity.name);
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/TextAndImage/" data-id="cinepjprc0004plzx9n05mktp" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/TextAndImage/" data-id="cinepjprc0004plzx9n05mktp" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li></ul>
@@ -803,7 +1023,7 @@ void myFunction()
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/HeapAndStack/" data-id="cinepjpr50001plzx3rtwmlto" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/HeapAndStack/" data-id="cinepjpr50001plzx3rtwmlto" class="article-share-link">Share</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
@@ -851,7 +1071,7 @@ void myFunction()
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/hello-world/" data-id="cinepjpre0006plzxalqckwl3" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/hello-world/" data-id="cinepjpre0006plzxalqckwl3" class="article-share-link">Share</a>
       
       
     </footer>
@@ -871,7 +1091,7 @@ void myFunction()
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Mot-clés</h3>
+    <h3 class="widget-title">Tags</h3>
     <div class="widget">
       <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/block/">block</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/copy/">copy</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
     </div>
@@ -881,7 +1101,7 @@ void myFunction()
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Nuage de mot-clés</h3>
+    <h3 class="widget-title">Tag Cloud</h3>
     <div class="widget tagcloud">
       <a href="/tags/NSMutableAttributedString/" style="font-size: 10px;">NSMutableAttributedString</a> <a href="/tags/block/" style="font-size: 10px;">block</a> <a href="/tags/copy/" style="font-size: 10px;">copy</a> <a href="/tags/堆栈/" style="font-size: 10px;">堆栈</a>
     </div>
@@ -900,7 +1120,7 @@ void myFunction()
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Articles récents</h3>
+    <h3 class="widget-title">Recent Posts</h3>
     <div class="widget">
       <ul>
         
@@ -937,7 +1157,7 @@ void myFunction()
   <div class="outer">
     <div id="footer-info" class="inner">
       &copy; 2016 Xiang<br>
-      Propulsé by <a href="http://hexo.io/" target="_blank">Hexo</a>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
     </div>
   </div>
 </footer>

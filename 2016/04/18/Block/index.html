@@ -10,9 +10,9 @@
 怎么用
 为什么这么用
 
-block用法分类：
+block的堆栈分类：
 根据Block在内存中的位置分为三种类型NSGlobalBlock，NSStackBlock, NSMallocBlock。
-NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存，函数返回后Block将无效； NSMallocBlock：位于堆内存。需要开发者进行释放。区分：非A">
+NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存，函数返回后Block将无效； NSMallocBlock：位于堆内存。需要开发者进行释放。区分：非">
 <meta property="og:type" content="article">
 <meta property="og:title" content="block详解">
 <meta property="og:url" content="http://yoursite.com/2016/04/18/Block/index.html">
@@ -22,10 +22,10 @@ NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存�
 怎么用
 为什么这么用
 
-block用法分类：
+block的堆栈分类：
 根据Block在内存中的位置分为三种类型NSGlobalBlock，NSStackBlock, NSMallocBlock。
-NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存，函数返回后Block将无效； NSMallocBlock：位于堆内存。需要开发者进行释放。区分：非A">
-<meta property="og:updated_time" content="2016-04-28T04:06:13.000Z">
+NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存，函数返回后Block将无效； NSMallocBlock：位于堆内存。需要开发者进行释放。区分：非">
+<meta property="og:updated_time" content="2016-05-03T15:04:06.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="block详解">
 <meta name="twitter:description" content="分两部分内容来剖析block：
@@ -33,9 +33,9 @@ NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存�
 怎么用
 为什么这么用
 
-block用法分类：
+block的堆栈分类：
 根据Block在内存中的位置分为三种类型NSGlobalBlock，NSStackBlock, NSMallocBlock。
-NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存，函数返回后Block将无效； NSMallocBlock：位于堆内存。需要开发者进行释放。区分：非A">
+NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存，函数返回后Block将无效； NSMallocBlock：位于堆内存。需要开发者进行释放。区分：非">
   
     <link rel="alternate" href="/atom.xml" title="孙翔的技术博客" type="application/atom+xml">
   
@@ -115,7 +115,7 @@ NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存�
 <li>怎么用</li>
 <li>为什么这么用</li>
 </ol>
-<h2 id="block用法"><a href="#block用法" class="headerlink" title="block用法"></a>block用法</h2><p>分类：</p>
+<h2 id="block的堆栈"><a href="#block的堆栈" class="headerlink" title="block的堆栈"></a>block的堆栈</h2><p>分类：</p>
 <p>根据Block在内存中的位置分为三种类型NSGlobalBlock，NSStackBlock, NSMallocBlock。</p>
 <p>NSGlobalBlock：类似函数，位于text段； NSStackBlock：位于栈内存，函数返回后Block将无效； NSMallocBlock：位于堆内存。需要开发者进行释放。<br>区分：非ARC下，无引用外部变量的即为NSGlobalBlock，引用外部变量的为NSStackBlock，NSStakBlock做copy即为NSMallocBlock。<br>内存管理：</p>
 <p>block是编译时生成的，而不是运行时生成的。所以在编译时如果用到外部变量就会把变量建一份快照放到栈上。</p>
@@ -380,6 +380,357 @@ static void _Block_byref_assign_copy(void *dest, const void *arg, const int flag
 }
 </code></pre>
 
+
+<h2 id="循环引用"><a href="#循环引用" class="headerlink" title="循环引用"></a>循环引用</h2><h3 id="现象"><a href="#现象" class="headerlink" title="现象"></a>现象</h3><p>对如下3个Person类分别做[[Person alloc] init]和[Person release]，查看Person类中dealloc是否会调用。</p>
+<p>类A PersonA：</p>
+<pre><code>typedef int (^square)(int);
+
+#import "Person.h"
+
+
+@interface Person ()
+{
+    square tempBlock;
+}
+
+@property (nonatomic, assign) int i;
+
+@end
+
+
+@implementation Person
+
+- (id) init
+{
+    self = [super init];
+    if (self)
+    {
+        _i = 8;
+        tempBlock = ^(int a){
+            return a * _i;
+        };
+
+        NSLog(@"tempBlock:%@", tempBlock);
+    }
+
+    return self;
+}
+
+
+- (void) funTest
+{
+    NSLog(@"tmpBlock:%d", tempBlock(5));
+}
+
+
+- (void) dealloc
+{
+    [super dealloc];
+
+    NSLog(@"dealloc run");
+}
+
+@end</code></pre>
+
+<p>类B:PersonB：</p>
+<pre><code>typedef int (^square)(int);
+
+#import "Person1.h"
+
+
+@interface Person1 ()
+{
+    square tempBlock;
+}
+
+@property (nonatomic, assign) int i;
+
+@end
+
+@implementation Person1
+
+
+- (id) init
+{
+    self = [super init];
+    if (self)
+    {
+        _i = 8;
+        square tempBlock1 = ^(int a){
+            return a * _i;
+        };
+
+        tempBlock = [tempBlock1 copy];
+
+        NSLog(@"tempBlock:%@, temptBlock1:%@", tempBlock, tempBlock1);
+    }
+
+    return self;
+}
+
+
+- (void) funTest
+{
+    NSLog(@"tmpBlock:%d", tempBlock(5));
+}
+
+
+- (void) dealloc
+{
+    [super dealloc];
+
+    NSLog(@"dealloc run");
+}
+
+@end
+</code></pre>
+
+<p>类C：PersonC:</p>
+<pre><code>typedef int (^square)(int);
+
+#import "Person2.h"
+
+@interface Person2 ()
+{
+    square tempBlock;
+}
+
+@property (nonatomic, assign) int i;
+
+@end
+
+
+@implementation Person2
+
+
+- (id) init
+{
+    self = [super init];
+    if (self)
+    {
+        _i = 8;
+        __block Person2* weakSelf = self;
+        square tempBlock1 = ^(int a){
+            return a * weakSelf.i;
+        };
+
+        tempBlock = [tempBlock1 copy];
+
+        NSLog(@"tempBlock:%@, temptBlock1:%@", tempBlock, tempBlock1);
+    }
+
+    return self;
+}
+
+
+- (void) funTest
+{
+    NSLog(@"tmpBlock:%d", tempBlock(5));
+}
+
+
+- (void) dealloc
+{
+    [super dealloc];
+
+    NSLog(@"dealloc run");
+}
+
+@end</code></pre>
+
+<p>发现：</p>
+<ol>
+<li>A和C的dealloc会调用，而B的dealloc不会调用</li>
+<li>A中的block为栈的block，B和C的tempBlock为堆的block（从栈中copy了）</li>
+<li>说明栈的block不会强引用self，而堆的block会强引用self。如果加上__block Person2* weakSelf = self;时，再在block中访问weakSelf的变量就不会强引用weakSelf。</li>
+</ol>
+<p>为什么？</p>
+<h3 id="本质实现探究"><a href="#本质实现探究" class="headerlink" title="本质实现探究"></a>本质实现探究</h3><p>查看源码实现，就知道栈上的blockcopy到堆上时，对person对象进行了retain，而当person对象加上__block时，block内部就不会对person进行retain了。具体如下：<br>对person1代码进行clang查看源码如下：</p>
+<pre><code>struct __block_impl 
+{
+    void *isa;
+    int Flags;
+    int Reserved;
+    void *FuncPtr;
+};
+
+struct Person1_IMPL
+{
+    struct NSObject_IMPL NSObject_IVARS;
+    square tempBlock;
+    int _i;
+};
+
+struct __Person1__init_block_impl_0 
+{
+   struct __block_impl impl;
+   struct __Person1__init_block_desc_0* Desc;
+   Person1 *self;
+   __Person1__init_block_impl_0(void *fp, struct __Person1__init_block_desc_0 *desc, Person1 *_self, int flags=0) : self(_self) 
+   {
+     impl.isa = &_NSConcreteStackBlock;
+     impl.Flags = flags;
+     impl.FuncPtr = fp;
+     Desc = desc;
+  }
+};
+
+static int __Person1__init_block_func_0(struct __Person1__init_block_impl_0 *__cself, int a) 
+{
+    Person1 *self = __cself->self; // bound by copy
+    return a * (*(int *)((char *)self + OBJC_IVAR_$_Person1$_i));
+}
+
+static void __Person1__init_block_copy_0(struct __Person1__init_block_impl_0*dst, struct __Person1__init_block_impl_0*src) 
+{
+    _Block_object_assign((void*)&dst->self, (void*)src->self, 3/     
+    *BLOCK_FIELD_IS_OBJECT*/);
+}
+
+
+static void __Person1__init_block_dispose_0(struct __Person1__init_block_impl_0*src) 
+{
+   _Block_object_dispose((void*)src->self, 3/*BLOCK_FIELD_IS_OBJECT*/);
+}
+
+
+static struct __Person1__init_block_desc_0 
+{
+    size_t reserved;
+    size_t Block_size;
+    void (*copy)(struct __Person1__init_block_impl_0*, struct __Person1__init_block_impl_0*);
+    void (*dispose)(struct __Person1__init_block_impl_0*);
+} __Person1__init_block_desc_0_DATA = { 0, sizeof(struct __Person1__init_block_impl_0), __Person1__init_block_copy_0, __Person1__init_block_dispose_0};
+
+
+static id _I_Person1_init(Person1 * self, SEL _cmd) 
+{
+    self = ((Person1 *(*)(__rw_objc_super *, SEL))(void *)objc_msgSendSuper)((__rw_objc_super){(id)self, (id)class_getSuperclass(objc_getClass("Person1"))}, sel_registerName("init"));
+    if (self)
+    {
+        (*(int *)((char *)self + OBJC_IVAR_$_Person1$_i)) = 8;
+        square tempBlock1 = ((int (*)(int))&__Person1__init_block_impl_0((void *)__Person1__init_block_func_0, &__Person1__init_block_desc_0_DATA, self, 570425344));
+
+        (*(square *)((char *)self + OBJC_IVAR_$_Person1$tempBlock)) = (square)((id (*)(id, SEL))(void *)objc_msgSend)((id)tempBlock1, sel_registerName("copy"));
+
+        NSLog((NSString *)&__NSConstantStringImpl__var_folders_4x_l4ckkvk570s3grlbg_9fdk_40000gn_T_Person1_617ecb_mi_0, (*(square *)((char *)self + OBJC_IVAR_$_Person1$tempBlock)), tempBlock1);
+    }
+
+    return self;
+}
+
+static void _I_Person1_funTest(Person1 * self, SEL _cmd) 
+{
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_4x_l4ckkvk570s3grlbg_9fdk_40000gn_T_Person1_617ecb_mi_1, ((int (*)(__block_impl *, int))((__block_impl *)(*(square *)((char *)self + OBJC_IVAR_$_Person1$tempBlock)))->FuncPtr)((__block_impl *)(*(square *)((char *)self + OBJC_IVAR_$_Person1$tempBlock)), 5));
+}
+
+static void _I_Person1_dealloc(Person1 * self, SEL _cmd) 
+{
+    ((void (*)(__rw_objc_super *, SEL))(void *)objc_msgSendSuper)((__rw_objc_super){(id)self, (id)class_getSuperclass(objc_getClass("Person1"))}, sel_registerName("dealloc"));
+
+    NSLog((NSString *)&__NSConstantStringImpl__var_folders_4x_l4ckkvk570s3grlbg_9fdk_40000gn_T_Person1_617ecb_mi_2);
+}
+
+static int _I_Person1_i(Person1 * self, SEL _cmd) { return (*(int *)((char *)self + OBJC_IVAR_$_Person1$_i)); }
+static void _I_Person1_setI_(Person1 * self, SEL _cmd, int i) { (*(int *)((char *)self + OBJC_IVAR_$_Person1$_i)) = i; }
+// @end</code></pre>
+
+<p>结合runtime.h查看上面代码的执行过程：</p>
+<ol>
+<li>先执行_I_Person1_init这个函数，执行block的copy。查看runtime.h中block_copy会执行_Block_copy_internal</li>
+<li>执行_Block_copy_internal(const void <em>arg, const int flags)中<pre><code>struct Block_layout </code></pre></em>aBlock;<br> // The following would be better done as a switch statement<br> aBlock = (struct Block_layout *)arg;// Its a stack block.  Make a copy.<br> if (!isGC) {<pre><code>struct Block_layout *result = malloc(aBlock-&gt;descriptor-&gt;size);
+if (!result) return (void *)0;
+memmove(result, aBlock, aBlock-&gt;descriptor-&gt;size); // bitcopy first
+// reset refcount
+result-&gt;flags &amp;= ~(BLOCK_REFCOUNT_MASK);    // XXX not needed
+result-&gt;flags |= BLOCK_NEEDS_FREE | 1;
+result-&gt;isa = _NSConcreteMallocBlock;
+if (result-&gt;flags &amp; BLOCK_HAS_COPY_DISPOSE) {
+    //printf(&quot;calling block copy helper %p(%p, %p)...\n&quot;, aBlock-&gt;descriptor-&gt;copy, result, aBlock);
+    (*aBlock-&gt;descriptor-&gt;copy)(result, aBlock); // do fixup
+}
+return result;
+</code></pre> }  </li>
+<li>执行上面对栈上的block进行copy，在堆上生成新的内存块，flag为BLOCK_NEEDS_FREE和~(BLOCK_REFCOUNT_MASK)记得这个后面会用。isa声明为堆的block。然后执行(*aBlock-&gt;descriptor-&gt;copy)(result, aBlock)即上面的<strong>Person1</strong>init_block_copy_0函数</li>
+<li>执行_Block_object_assign((void<em>)&amp;dst-&gt;self, (void</em>)src-&gt;self, 3/<br> <em>BLOCK_FIELD_IS_OBJECT</em>/);查看runtime.h查看其实现。</li>
+<li>执行的代码如下：<pre><code>void _Block_object_assign(void <em>destAddr, const void </em>object, const int flags)<br>{<br> // (this test must be after previous one)<br> else if ((flags &amp; BLOCK_FIELD_IS_OBJECT) == BLOCK_FIELD_IS_OBJECT) {<pre><code>//printf(&quot;retaining object at %p\n&quot;, object);
+_Block_retain_object(object);
+//printf(&quot;done retaining object at %p\n&quot;, object);
+_Block_assign((void *)object, destAddr);
+</code></pre> }<br>}</code></pre></li>
+<li>对object即src-&gt;self即block持有的person进行了retain,而_block_assign把栈上持有的person对象的内存地址赋值到堆上面person的对象的地址。这样指向一个person对象就可以直接操作person对象的变量和值。</li>
+</ol>
+<p>同样对person2进行源码编译，查看runtime.c，也详细分析下步骤 编译后的源码：<pre><code>struct __block_impl {<br>  void <em>isa;<br>  int Flags;<br>  int Reserved;<br>  void </em>FuncPtr;};</code></pre></p>
+<p>static void <strong>Block_byref_id_object_copy_131(void <em>dst, void </em>src) {<br>   // 4个指针加上2个int 4<em>8+2</em>4=40即</strong>Block_byref_weakSelf_0中的person对象 131即为BLOCK_FIELD_IS_OBJECT|BLOCK_BYREF_CALLE<br>   _Block_object_assign((char<em>)dst + 40, </em>(void <em> </em>) ((char<em>)src + 40), 131);<br>}<br>static void __Block_byref_id_object_dispose_131(void </em>src) {<br> _Block_object_dispose(<em>(void </em> <em>) ((char</em>)src + 40), 131);<br>}<br>static <strong>NSConstantStringImpl </strong>NSConstantStringImpl<strong>var_folders_4x_l4ckkvk570s3grlbg_9fdk_40000gn_T_Person2_62cdd7_mi_0 </strong>attribute<strong> ((section (“</strong>DATA, <strong>cfstring”))) = {</strong>CFConstantStringClassReference,0x000007c8,”tempBlock:%@, temptBlock1:%@”,28};<br>static <strong>NSConstantStringImpl </strong>NSConstantStringImpl<strong>var_folders_4x_l4ckkvk570s3grlbg_9fdk_40000gn_T_Person2_62cdd7_mi_1 </strong>attribute<strong> ((section (“</strong>DATA, <strong>cfstring”))) = {</strong>CFConstantStringClassReference,0x000007c8,”tmpBlock:%d”,11};<br>static <strong>NSConstantStringImpl </strong>NSConstantStringImpl<strong>var_folders_4x_l4ckkvk570s3grlbg_9fdk_40000gn_T_Person2_62cdd7_mi_2 </strong>attribute<strong> ((section (“</strong>DATA, <strong>cfstring”))) = {</strong>CFConstantStringClassReference,0x000007c8,”dealloc run”,11};</p>
+<p>struct <strong>Block_byref_weakSelf_0 {<br>  void *</strong>isa;<br><strong>Block_byref_weakSelf_0 *</strong>forwarding;<br> int <strong>flags;<br> int </strong>size;<br> void (<em>__Block_byref_id_object_copy)(void</em>, void<em>);<br> void (</em>__Block_byref_id_object_dispose)(void<em>);<br> Person2 </em>weakSelf;<br>};</p>
+<p>struct <strong>Person2</strong>init_block_impl_0 {<br>  struct <strong>block_impl impl;<br>  struct </strong>Person2<strong>init_block_desc_0* Desc;
+  </strong>Block_byref_weakSelf_0 <em>weakSelf; // by ref<br>  <strong>Person2</strong>init_block_impl_0(void </em>fp, struct <strong>Person2</strong>init_block_desc_0 <em>desc, __Block_byref_weakSelf_0 </em>_weakSelf, int flags=0) : weakSelf(_weakSelf-&gt;__forwarding) {<br>    impl.isa = &amp;_NSConcreteStackBlock;<br>    impl.Flags = flags;<br>    impl.FuncPtr = fp;<br>    Desc = desc;<br>  }<br>};</p>
+<p>static int <strong>Person2</strong>init_block_func_0(struct <strong>Person2</strong>init_block_impl_0 <em><strong>cself, int a)<br>{
+    </strong>Block_byref_weakSelf_0 </em>weakSelf = <strong>cself-&gt;weakSelf; // bound by ref<br>    return a <em> ((int (</em>)(id, SEL))(void *)objc_msgSend)((id)(weakSelf-&gt;</strong>forwarding-&gt;weakSelf), sel_registerName(“i”));<br>}</p>
+<p>static void <strong>Person2</strong>init_block_copy_0(struct <strong>Person2</strong>init_block_impl_0<em>dst, struct <strong>Person2</strong>init_block_impl_0</em>src)<br>{<br>    _Block_object_assign((void<em>)&amp;dst-&gt;weakSelf, (void</em>)src-&gt;weakSelf, 8/<em>BLOCK_FIELD_IS_BYREF</em>/);<br>}</p>
+<p>static void <strong>Person2</strong>init_block_dispose_0(struct <strong>Person2</strong>init_block_impl_0<em>src)<br>{<br>    _Block_object_dispose((void</em>)src-&gt;weakSelf, 8/<em>BLOCK_FIELD_IS_BYREF</em>/);<br>}</p>
+<p>static struct <strong>Person2</strong>init_block_desc_0<br>{<br>  size_t reserved;<br>  size_t Block_size;<br>  void (<em>copy)(struct <strong>Person2</strong>init_block_impl_0</em>, struct <strong>Person2</strong>init_block_impl_0<em>);<br>  void (</em>dispose)(struct <strong>Person2</strong>init_block_impl_0*);<br>} <strong>Person2</strong>init_block_desc_0_DATA = { 0, sizeof(struct <strong>Person2</strong>init_block_impl_0), <strong>Person2</strong>init_block_copy_0, <strong>Person2</strong>init_block_dispose_0};</p>
+<p>static id _I_Person2_init(Person2 <em> self, SEL _cmd) {<br>    self = ((Person2 </em>(<em>)(__rw_objc_super </em>, SEL))(void <em>)objc_msgSendSuper)((__rw_objc_super){(id)self, (id)class_getSuperclass(objc_getClass(“Person2”))}, sel_registerName(“init”));<br>    if (self)<br>    {<br>       //33554432即为BLOCK_HAS_COPY_DISPOSE<br>       (</em>(int <em>)((char </em>)self + OBJC<em>IVAR</em>$_Person2$_i)) = 8;<br>        <strong>attribute</strong>((<strong>blocks</strong>(byref))) <strong>Block_byref_weakSelf_0 weakSelf = {(void*)0,(</strong>Block_byref_weakSelf_0 <em>)&amp;weakSelf, 33554432, sizeof(<strong>Block_byref_weakSelf_0), </strong>Block_byref_id_object_copy_131, __Block_byref_id_object_dispose_131, self};<br>        square tempBlock1 = ((int (</em>)(int))&amp;<strong>Person2</strong>init_block_impl_0((void <em>)<strong>Person2</strong>init_block_func_0, &amp;<strong>Person2</strong>init_block_desc_0_DATA, (__Block_byref_weakSelf_0 </em>)&amp;weakSelf, 570425344));<br>     (<em>(square </em>)((char <em>)self + OBJC<em>IVAR</em>$_Person2$tempBlock)) = (square)((id (</em>)(id, SEL))(void <em>)objc_msgSend)((id)tempBlock1, sel_registerName(“copy”));<br>     NSLog((NSString </em>)&amp;<strong>NSConstantStringImpl</strong>var_folders_4x_l4ckkvk570s3grlbg_9fdk_40000gn_T_Person2_62cdd7_mi_0, (<em>(square </em>)((char *)self + OBJC<em>IVAR</em>$_Person2$tempBlock)), tempBlock1);<br>    }<br>    return self;<br>}</p>
+<p>static void _I_Person2_funTest(Person2 <em> self, SEL _cmd)<br>{<br>    NSLog((NSString </em>)&amp;<strong>NSConstantStringImpl</strong>var_folders_4x_l4ckkvk570s3grlbg_9fdk_40000gn_T_Person2_62cdd7_mi_1, ((int (<em>)(__block_impl </em>, int))((<strong>block_impl <em>)(</em>(square <em>)((char </em>)self + OBJC<em>IVAR</em>$_Person2$tempBlock)))-&gt;FuncPtr)((</strong>block_impl <em>)(</em>(square <em>)((char </em>)self + OBJC<em>IVAR</em>$_Person2$tempBlock)), 5));<br>}</p>
+<p>static void _I_Person2_dealloc(Person2 <em> self, SEL _cmd)<br>{<br>    ((void (</em>)(<strong>rw_objc_super <em>, SEL))(void </em>)objc_msgSendSuper)((</strong>rw_objc_super){(id)self, (id)class_getSuperclass(objc_getClass(“Person2”))}, sel_registerName(“dealloc”));<br>    ((void (<em>)(id, SEL))(void </em>)objc_msgSend)((id)(<em>(square </em>)((char <em>)self + OBJC<em>IVAR</em>$_Person2$tempBlock)), sel_registerName(“release”));<br>    NSLog((NSString </em>)&amp;<strong>NSConstantStringImpl</strong>var_folders_4x_l4ckkvk570s3grlbg_9fdk_40000gn_T_Person2_62cdd7_mi_2);<br>}</p>
+<p>static int _I_Person2_i(Person2 <em> self, SEL _cmd) { return (</em>(int <em>)((char </em>)self + OBJC<em>IVAR</em>$_Person2$_i)); }<br>static void _I_Person2<em>setI</em>(Person2 <em> self, SEL _cmd, int i) { (</em>(int <em>)((char </em>)self + OBJC<em>IVAR</em>$_Person2$_i)) = i; }<br></p>
+<p>执行步骤：</p>
+<ol>
+<li>执行_I_Person2_init，生成__Block_byref_weakSelf_0中weakSelf,用weakSelf生成tempBlock对象。执行tempBlock的copy。</li>
+<li><p>同样执行_Block_copy_internal(const void <em>arg, const int flags)中<pre><code>struct Block_layout </code></pre></em>aBlock;<br> // The following would be better done as a switch statement<br> aBlock = (struct Block_layout *)arg;// Its a stack block.  Make a copy.<br> if (!isGC) {</p>
+<pre><code>struct Block_layout *result = malloc(aBlock-&gt;descriptor-&gt;size);
+if (!result) return (void *)0;
+memmove(result, aBlock, aBlock-&gt;descriptor-&gt;size); // bitcopy first
+// reset refcount
+result-&gt;flags &amp;= ~(BLOCK_REFCOUNT_MASK);    // XXX not needed
+result-&gt;flags |= BLOCK_NEEDS_FREE | 1;
+result-&gt;isa = _NSConcreteMallocBlock;
+if (result-&gt;flags &amp; BLOCK_HAS_COPY_DISPOSE) {
+    //printf(&quot;calling block copy helper %p(%p, %p)...\n&quot;, aBlock-&gt;descriptor-&gt;copy, result, aBlock);
+    (*aBlock-&gt;descriptor-&gt;copy)(result, aBlock); // do fixup
+}
+return result;
+</code></pre><p> }</p>
+</li>
+<li><p>执行上面对栈上的block进行copy，在堆上生成新的内存块，flag为BLOCK_NEEDS_FREE和~(BLOCK_REFCOUNT_MASK)记得这个后面会用。isa声明为堆的block。然后执行(*aBlock-&gt;descriptor-&gt;copy)(result, aBlock)即上面的<strong>Person2</strong>init_block_copy_0函数</p>
+</li>
+<li>执行<pre><code>static void <strong>Person2</strong>init_block_copy_0(struct <strong>Person2</strong>init_block_impl_0<em>dst, struct <strong>Person2</strong>init_block_impl_0</em>src)<br>{<br> _Block_object_assign((void<em>)&amp;dst-&gt;weakSelf, (void</em>)src-&gt;weakSelf, 8/<em>BLOCK_FIELD_IS_BYREF</em>/);<br>}</code></pre></li>
+<li>查看runtime.h执行<pre><code>void _Block_object_assign(void <em>destAddr, const void </em>object, const int flags) {<br> else if ((flags &amp; BLOCK_FIELD_IS_BYREF) == BLOCK_FIELD_IS_BYREF)  {<pre><code>// copying a __block reference from the stack Block to the heap
+// flags will indicate if it holds a __weak reference and needs a special isa
+_Block_byref_assign_copy(destAddr, object, flags);
+</code></pre> }</code></pre></li>
+<li><p>执行<pre><code>static void _Block_byref_assign_copy(void <em>dest, const void </em>arg, const int flags) {<br> struct Block_byref <strong>destp = (struct Block_byref </strong>)dest;<br> struct Block_byref <em>src = (struct Block_byref </em>)arg;</code></pre></p>
+<p> else if ((src-&gt;forwarding-&gt;flags &amp; BLOCK_REFCOUNT_MASK) == 0) {</p>
+<pre><code>//printf(&quot;making copy\n&quot;);
+// src points to stack
+bool isWeak = ((flags &amp; (BLOCK_FIELD_IS_BYREF|BLOCK_FIELD_IS_WEAK)) == (BLOCK_FIELD_IS_BYREF|BLOCK_FIELD_IS_WEAK));
+// if its weak ask for an object (only matters under GC)
+struct Block_byref *copy = (struct Block_byref *)_Block_allocator(src-&gt;size, false, isWeak);
+copy-&gt;flags = src-&gt;flags | _Byref_flag_initial_value; // non-GC one for caller, one for stack
+copy-&gt;forwarding = copy; // patch heap copy to point to itself (skip write-barrier)
+src-&gt;forwarding = copy;  // patch stack to point to heap copy
+copy-&gt;size = src-&gt;size;
+if (isWeak) {
+    copy-&gt;isa = &amp;_NSConcreteWeakBlockVariable;  // mark isa field so it gets weak scanning
+}
+if (src-&gt;flags &amp; BLOCK_HAS_COPY_DISPOSE) {
+    // Trust copy helper to copy everything of interest
+    // If more than one field shows up in a byref block this is wrong XXX
+    copy-&gt;byref_keep = src-&gt;byref_keep;
+    copy-&gt;byref_destroy = src-&gt;byref_destroy;
+    (*src-&gt;byref_keep)(copy, src);
+}
+</code></pre><p> }<br> 其中最后(<em>src-&gt;byref_keep)(copy, src);即为：<strong>Block_byref_id_object_copy_131，static void </strong>Block_byref_id_object_copy_131(void </em>dst, void <em>src) {<br>// 4个指针加上2个int 4</em>8+2<em>4=40即__Block_byref_weakSelf_0中的person对象 131即为BLOCK_FIELD_IS_OBJECT|BLOCK_BYREF_CALLE<br>_Block_object_assign((char</em>)dst + 40, <em>(void </em> <em>) ((char</em>)src + 40), 131);<br>}</p>
+</li>
+<li>查看runTime.h<pre><code>void _Block_object_assign(void <em>destAddr, const void </em>object, const int flags) {<br> //printf(“_Block_object_assign(*%p, %p, %x)\n”, destAddr, object, flags);<br> if ((flags &amp; BLOCK_BYREF_CALLER) == BLOCK_BYREF_CALLER) {<pre><code>if ((flags &amp; BLOCK_FIELD_IS_WEAK) == BLOCK_FIELD_IS_WEAK) {
+    _Block_assign_weak(object, destAddr);
+}
+else {
+    // do *not* retain or *copy* __block variables whatever they are
+    _Block_assign((void *)object, destAddr);
+}
+</code></pre> }<br> }</code></pre>中执行_Block_assign即只把最初栈中person的指针赋值到堆中。不会对person进行retain。也所以不会造成循环引用。</li>
+</ol>
 
       
     </div>

@@ -206,7 +206,7 @@ NSLog(@"Name: %@", userEntity.name);
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cio8b1cyo0003zkzxleoq1rad" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cio8bn2uj00040kzxigmkauj5" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/copy/">copy</a></li></ul>
@@ -790,21 +790,25 @@ _Block_assign((void *)object, destAddr);
 </code></pre> }<br>}</code></pre></li>
 <li>对object即src-&gt;self即block持有的person进行了retain,而_block_assign把栈上持有的person对象的内存地址赋值到堆上面person的对象的地址。这样指向一个person对象就可以直接操作person对象的变量和值。</li>
 </ol>
-<p>同样对person2进行源码编译，查看runtime.c，也详细分析下步骤 编译后的源码：</p>
-<pre><code>struct __block_impl {
+<p>同样对person2进行源码编译，查看runtime.c，也详细分析下步骤 编译后的源码:</p>
+<pre><code>struct __block_impl 
+{
   void *isa;
   int Flags;
   int Reserved;
   void *FuncPtr;
-  };
+};
+
 
 static void __Block_byref_id_object_copy_131(void *dst, void *src){
    // 4个指针加上2个int 4*8+2*4=40即__Block_byref_weakSelf_0中的person对象 131即为BLOCK_FIELD_IS_OBJECT|BLOCK_BYREF_CALLE
    _Block_object_assign((char*)dst + 40, *(void * *) ((char*)src + 40), 131);
 }
+
 static void __Block_byref_id_object_dispose_131(void *src) {
  _Block_object_dispose(*(void * *) ((char*)src + 40), 131);
 }
+
 static __NSConstantStringImpl __NSConstantStringImpl__var_folders_4x_l4ckkvk570s3grlbg_9fdk_40000gn_T_Person2_62cdd7_mi_0 __attribute__ ((section ("__DATA, __cfstring"))) = {__CFConstantStringClassReference,0x000007c8,"tempBlock:%@, temptBlock1:%@",28};
 static __NSConstantStringImpl __NSConstantStringImpl__var_folders_4x_l4ckkvk570s3grlbg_9fdk_40000gn_T_Person2_62cdd7_mi_1 __attribute__ ((section ("__DATA, __cfstring"))) = {__CFConstantStringClassReference,0x000007c8,"tmpBlock:%d",11};
 static __NSConstantStringImpl __NSConstantStringImpl__var_folders_4x_l4ckkvk570s3grlbg_9fdk_40000gn_T_Person2_62cdd7_mi_2 __attribute__ ((section ("__DATA, __cfstring"))) = {__CFConstantStringClassReference,0x000007c8,"dealloc run",11};
@@ -955,7 +959,7 @@ else {
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/Block/" data-id="cio8b1cyd0000zkzxcoh9q871" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/Block/" data-id="cio8bn2u500000kzx25gde88c" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/block/">block</a></li></ul>
@@ -1306,7 +1310,7 @@ else {
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/TextAndImage/" data-id="cio8b1cys0006zkzxn6hjhggx" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/TextAndImage/" data-id="cio8bn2uh00030kzxqre2qon9" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li></ul>
@@ -1464,7 +1468,7 @@ void myFunction()
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/HeapAndStack/" data-id="cio8b1cyi0001zkzxs7v6wobh" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/HeapAndStack/" data-id="cio8bn2ub00010kzx2izyx0tp" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
@@ -1512,7 +1516,7 @@ void myFunction()
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/hello-world/" data-id="cio8b1cyq0004zkzxj8zgmks6" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/hello-world/" data-id="cio8bn2ul00060kzxn03fmkhl" class="article-share-link">Partager</a>
       
       
     </footer>

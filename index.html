@@ -55,9 +55,9 @@
       </nav>
       <nav id="sub-nav">
         
-          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="Flux RSS"></a>
         
-        <a id="nav-search-btn" class="nav-icon" title="Search"></a>
+        <a id="nav-search-btn" class="nav-icon" title="Rechercher"></a>
       </nav>
       <div id="search-form-wrap">
         <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" results="0" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://yoursite.com"></form>
@@ -206,7 +206,7 @@ NSLog(@"Name: %@", userEntity.name);
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cio8c416400041czx5pyqex2e" class="article-share-link">Share</a>
+      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cio8c6yj9000022zxpuwdpyrz" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/copy/">copy</a></li></ul>
@@ -914,8 +914,9 @@ static void _I_Person2_setI_(Person2 * self, SEL _cmd, int i) { (*(int *)((char 
      return result;
  }</code></pre></li>
 <li>执行上面对栈上的block进行copy，在堆上生成新的内存块，flag为BLOCK_NEEDS_FREE和~(BLOCK_REFCOUNT_MASK)记得这个后面会用。isa声明为堆的block。然后执行(*aBlock-&gt;descriptor-&gt;copy)(result, aBlock)即上面的<strong>Person2</strong>init_block_copy_0函数</li>
-<li>执行<pre><code>static void __Person2__init_block_copy_0(struct __Person2__init_block_impl_0*dst, struct __Person2__init_block_impl_0*src){
- _Block_object_assign((void*)&dst->weakSelf, (void*)src->weakSelf, 8/*BLOCK_FIELD_IS_BYREF*/);
+<li>执行<pre><code>static void __Person2__init_block_copy_0(struct __Person2__init_block_impl_0*dst, struct __Person2__init_block_impl_0*src)
+{
+_Block_object_assign((void*)&dst->weakSelf, (void*)src->weakSelf, 8/*BLOCK_FIELD_IS_BYREF*/);
 }</code></pre></li>
 <li>查看runtime.h执行<pre><code>void _Block_object_assign(void *destAddr, const void *object, const int flags) 
 {
@@ -949,7 +950,7 @@ if (src-&gt;flags &amp; BLOCK_HAS_COPY_DISPOSE) {
 }
 </code></pre><p> }<br> 其中最后(<em>src-&gt;byref_keep)(copy, src);即为：<strong>Block_byref_id_object_copy_131，static void </strong>Block_byref_id_object_copy_131(void </em>dst, void <em>src) {<br>// 4个指针加上2个int 4</em>8+2<em>4=40即__Block_byref_weakSelf_0中的person对象 131即为BLOCK_FIELD_IS_OBJECT|BLOCK_BYREF_CALLE<br>_Block_object_assign((char</em>)dst + 40, <em>(void </em> <em>) ((char</em>)src + 40), 131);<br>}</p>
 </li>
-<li>查看runTime.h<pre><code>void _Block_object_assign(void <em>destAddr, const void </em>object, const int flags) {<br> //printf(“_Block_object_assign(*%p, %p, %x)\n”, destAddr, object, flags);<br> if ((flags &amp; BLOCK_BYREF_CALLER) == BLOCK_BYREF_CALLER) {<pre><code>if ((flags &amp; BLOCK_FIELD_IS_WEAK) == BLOCK_FIELD_IS_WEAK) {
+<li>查看runTime.h<br><pre><code>void _Block_object_assign(void <em>destAddr, const void </em>object, const int flags) {<br> //printf(“_Block_object_assign(*%p, %p, %x)\n”, destAddr, object, flags);<br> if ((flags &amp; BLOCK_BYREF_CALLER) == BLOCK_BYREF_CALLER) {<pre><code>if ((flags &amp; BLOCK_FIELD_IS_WEAK) == BLOCK_FIELD_IS_WEAK) {
     _Block_assign_weak(object, destAddr);
 }
 else {
@@ -962,7 +963,7 @@ else {
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/Block/" data-id="cio8c415r00001czxcx3baesh" class="article-share-link">Share</a>
+      <a data-url="http://yoursite.com/2016/04/18/Block/" data-id="cio8c6yjg000122zxnjw22jit" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/block/">block</a></li></ul>
@@ -1313,7 +1314,7 @@ else {
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/TextAndImage/" data-id="cio8c415w00011czx3h43goa3" class="article-share-link">Share</a>
+      <a data-url="http://yoursite.com/2016/04/18/TextAndImage/" data-id="cio8c6yjs000622zxajdclsr6" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li></ul>
@@ -1471,7 +1472,7 @@ void myFunction()
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/HeapAndStack/" data-id="cio8c416200031czxni8zaofb" class="article-share-link">Share</a>
+      <a data-url="http://yoursite.com/2016/04/18/HeapAndStack/" data-id="cio8c6yjm000322zx4i4kn7ar" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
@@ -1519,7 +1520,7 @@ void myFunction()
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/hello-world/" data-id="cio8c416600061czxdjm6swvt" class="article-share-link">Share</a>
+      <a data-url="http://yoursite.com/2016/04/18/hello-world/" data-id="cio8c6yjp000422zxnofd1u6k" class="article-share-link">Partager</a>
       
       
     </footer>
@@ -1539,7 +1540,7 @@ void myFunction()
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Tags</h3>
+    <h3 class="widget-title">Mot-clés</h3>
     <div class="widget">
       <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/block/">block</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/copy/">copy</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
     </div>
@@ -1549,7 +1550,7 @@ void myFunction()
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Tag Cloud</h3>
+    <h3 class="widget-title">Nuage de mot-clés</h3>
     <div class="widget tagcloud">
       <a href="/tags/NSMutableAttributedString/" style="font-size: 10px;">NSMutableAttributedString</a> <a href="/tags/block/" style="font-size: 10px;">block</a> <a href="/tags/copy/" style="font-size: 10px;">copy</a> <a href="/tags/堆栈/" style="font-size: 10px;">堆栈</a>
     </div>
@@ -1568,7 +1569,7 @@ void myFunction()
   
     
   <div class="widget-wrap">
-    <h3 class="widget-title">Recent Posts</h3>
+    <h3 class="widget-title">Articles récents</h3>
     <div class="widget">
       <ul>
         
@@ -1605,7 +1606,7 @@ void myFunction()
   <div class="outer">
     <div id="footer-info" class="inner">
       &copy; 2016 Xiang<br>
-      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+      Propulsé by <a href="http://hexo.io/" target="_blank">Hexo</a>
     </div>
   </div>
 </footer>

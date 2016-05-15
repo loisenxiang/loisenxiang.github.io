@@ -1,18 +1,10 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="X-UA-Compatible" content="chrome=1">
   
   <title>copy与mutableCopy的内存管理剖析 | 孙翔的技术博客</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  
-    <meta name="author" content="Xiang">
-  
-  
-    <meta name="description" content="copy与mutableCopy相关的内存管理不知道为什么一说这个，很多人都拿NSString和NSMutableString做测试，我想最直接的是因为常用又实现了copy和mutableCopy的代理，但是NSString类的其实比较特殊，不应该拿NSString来测试，所以本文拿实现代理的NSURLRequest来做测试。
-immutableObject：非集合的NSURL *url = [[">
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <meta name="description" content="copy与mutableCopy相关的内存管理不知道为什么一说这个，很多人都拿NSString和NSMutableString做测试，我想最直接的是因为常用又实现了copy和mutableCopy的代理，但是NSString类的其实比较特殊，不应该拿NSString来测试，所以本文拿实现代理的NSURLRequest来做测试。
 immutableObject：非集合的NSURL *url = [[">
 <meta property="og:type" content="article">
@@ -27,66 +19,80 @@ immutableObject：非集合的NSURL *url = [[">
 <meta name="twitter:description" content="copy与mutableCopy相关的内存管理不知道为什么一说这个，很多人都拿NSString和NSMutableString做测试，我想最直接的是因为常用又实现了copy和mutableCopy的代理，但是NSString类的其实比较特殊，不应该拿NSString来测试，所以本文拿实现代理的NSURLRequest来做测试。
 immutableObject：非集合的NSURL *url = [[">
   
+    <link rel="alternate" href="/atom.xml" title="孙翔的技术博客" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.png">
+  
+  
+    <link href="//fonts.googleapis.com/css?family=Source+Code+Pro" rel="stylesheet" type="text/css">
   
   <link rel="stylesheet" href="/css/style.css">
-  <!--[if lt IE 9]><script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
   
-  
-<script type="text/javascript">
-var _hmt = _hmt || [];
-(function() {
-  var hm = document.createElement("script");
-  hm.src = "//hm.baidu.com/hm.js?e956d17d7b38ce0b127901c9167bb957";
-  var s = document.getElementsByTagName("script")[0]; 
-  s.parentNode.insertBefore(hm, s);
-})();
-</script>
-
 
 </head>
 
 <body>
-  <div class="wrapper">
-    <header id="header">
-  <div class="title">
-    <h1><a href="/">孙翔的技术博客</a></h1>
-    <p><a href="/">积累学到的点点滴滴</a></p>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">孙翔的技术博客</a>
+      </h1>
+      
+        <h2 id="subtitle-wrap">
+          <a href="/" id="subtitle">积累学到的点点滴滴</a>
+        </h2>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="Flux RSS"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="Rechercher"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" results="0" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://yoursite.com"></form>
+      </div>
+    </div>
   </div>
-  <nav class="nav">
-    <ul>
-      
-        <li><a href="/archives">Archives</a></li>
-      
-        <li><a href="/reading">Reading</a></li>
-      
-        <li><a href="/about">About</a></li>
-      
-      
-    </ul>
-    <div class="clearfix"></div>
-  </nav>
-  <div class="clearfix"></div>
 </header>
-    <div class="content"><article class="post">
-  <header>
-    
-      <div class="icon"></div>
-      <a href="/2016/04/24/copy/">
-  <time datetime="2016-04-24T08:50:04.000Z">
-    2016-04-24
-  </time>
+      <div class="outer">
+        <section id="main"><article id="post-copy" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2016/04/24/copy/" class="article-date">
+  <time datetime="2016-04-24T08:50:04.000Z" itemprop="datePublished">2016-04-24</time>
 </a>
     
+  </div>
+  <div class="article-inner">
     
+    
+      <header class="article-header">
+        
   
-    <h1 class="title">copy与mutableCopy的内存管理剖析</h1>
+    <h1 class="article-title" itemprop="name">
+      copy与mutableCopy的内存管理剖析
+    </h1>
   
 
-  </header>
-  
-  <div class="entry">
+      </header>
     
-      <h2 id="copy与mutableCopy相关的内存管理"><a href="#copy与mutableCopy相关的内存管理" class="headerlink" title="copy与mutableCopy相关的内存管理"></a>copy与mutableCopy相关的内存管理</h2><p>不知道为什么一说这个，很多人都拿NSString和NSMutableString做测试，我想最直接的是因为常用又实现了copy和mutableCopy的代理，但是NSString类的其实比较特殊，不应该拿NSString来测试，所以本文拿实现代理的NSURLRequest来做测试。</p>
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="copy与mutableCopy相关的内存管理"><a href="#copy与mutableCopy相关的内存管理" class="headerlink" title="copy与mutableCopy相关的内存管理"></a>copy与mutableCopy相关的内存管理</h2><p>不知道为什么一说这个，很多人都拿NSString和NSMutableString做测试，我想最直接的是因为常用又实现了copy和mutableCopy的代理，但是NSString类的其实比较特殊，不应该拿NSString来测试，所以本文拿实现代理的NSURLRequest来做测试。</p>
 <h4 id="immutableObject："><a href="#immutableObject：" class="headerlink" title="immutableObject："></a>immutableObject：</h4><h5 id="非集合的"><a href="#非集合的" class="headerlink" title="非集合的"></a>非集合的</h5><pre><code>NSURL *url = [[NSURL alloc] initWithString:@"ceshi"];
 NSURLRequest *urlRequest = [[NSURLRequest alloc] initWithURL:url];
 NSLog(@"urlReqeust:%@, urlRequestRec:%ld", urlRequest, [urlRequest retainCount]);  
@@ -199,68 +205,129 @@ NSLog(@"Name: %@", userEntity.name);
 <p>如果更改为：@interface UserEntity : NSObject <nscopying><br>@property(copy, nonatomic) NSString *name;<br>@end</nscopying></p>
 <p>则输出为: tutuge</p>
 
-    
-  </div>
-  <footer>
-    
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cio5cn3e90004hwzxb0hc12k4" class="article-share-link">Partager</a>
       
       
-  <div class="tags">
-    <a class="tags-link" href="/tags/copy/">copy</a>
-  </div>
+  <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/copy/">copy</a></li></ul>
 
+    </footer>
+  </div>
+  
     
-    <div class="clearfix"></div>
-  </footer>
+<nav id="article-nav">
+  
+  
+    <a href="/2016/04/18/Block/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Ancien</strong>
+      <div class="article-nav-title">block深度剖析</div>
+    </a>
+  
+</nav>
+
+  
 </article>
 
-
-<section id="comment">
-  <h1 class="title">评论</h1>
-  <div class="ds-thread" data-title="copy与mutableCopy的内存管理剖析">
-  </div>
 </section>
+        
+          <aside id="sidebar">
+  
+    
 
-</div>
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Mot-clés</h3>
+    <div class="widget">
+      <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/block/">block</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/copy/">copy</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
+    </div>
   </div>
-  <footer id="footer"><div class="copyright">
+
+
   
-  &copy; 2016 <a href="/">Xiang</a>
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Nuage de mot-clés</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/NSMutableAttributedString/" style="font-size: 10px;">NSMutableAttributedString</a> <a href="/tags/block/" style="font-size: 10px;">block</a> <a href="/tags/copy/" style="font-size: 10px;">copy</a> <a href="/tags/堆栈/" style="font-size: 10px;">堆栈</a>
+    </div>
+  </div>
+
   
-</div>
-<div class="theme-copyright">
-  Theme by <a href="https://github.com/orderedlist" target="_blank">orderedlist</a>
-   | 
-  Redesign by <a href="http://heroicyang.com/" target="_blank">Heroic Yang</a>
-</div>
-<div class="clearfix"></div></footer>
-  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
-<script src="/js/scale.fix.js"></script>
-<script src="/js/jquery.imagesloaded.min.js"></script>
-<script src="/js/gallery.js"></script>
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/04/">April 2016</a></li></ul>
+    </div>
+  </div>
 
 
-<script type="text/javascript">
-  var duoshuoQuery = { short_name: 'niuxiaoxiang' };
-  (function() {
-    var ds = document.createElement('script');
-    ds.type = 'text/javascript';
-    ds.async = true;
-    ds.src = 'http://static.duoshuo.com/embed.js';
-    ds.charset = 'UTF-8';
-    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(ds);
-  })();
-</script>
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Articles récents</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2016/04/24/copy/">copy与mutableCopy的内存管理剖析</a>
+          </li>
+        
+          <li>
+            <a href="/2016/04/18/Block/">block深度剖析</a>
+          </li>
+        
+          <li>
+            <a href="/2016/04/18/TextAndImage/">文字和图片混排</a>
+          </li>
+        
+          <li>
+            <a href="/2016/04/18/HeapAndStack/">深度剖析堆栈</a>
+          </li>
+        
+          <li>
+            <a href="/2016/04/18/hello-world/">Hello World</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2016 Xiang<br>
+      Propulsé by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
 
 
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox.css">
+  <script src="/fancybox/jquery.fancybox.pack.js"></script>
 
-<link rel="stylesheet" href="/fancybox/jquery.fancybox.css" media="screen" type="text/css">
-<script src="/fancybox/jquery.fancybox.pack.js"></script>
-<script type="text/javascript">
-  (function($){
-    $('.fancybox').fancybox();
-  })(jQuery);
-</script>
 
+<script src="/js/script.js"></script>
+
+  </div>
 </body>
 </html>

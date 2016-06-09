@@ -68,6 +68,340 @@
       <div class="outer">
         <section id="main">
   
+    <article id="post-lock比较" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2016/05/20/lock比较/" class="article-date">
+  <time datetime="2016-05-20T10:22:10.000Z" itemprop="datePublished">2016-05-20</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2016/05/20/lock比较/">lock比较</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>本文做如下分析：</p>
+<ol>
+<li>IOS对于共享资源的各种处理</li>
+<li>各种处理的性能比较</li>
+</ol>
+<p>用法：<br>使用如下obj对象进行分析</p>
+<pre><code>@implementation TestClass
+- (void) testLog1
+{
+    NSLog(@"======Test Log1");
+}
+- (void) testLog2
+{
+    NSLog(@"=======Test Log2");
+}
+@end</code></pre>
+
+
+<p>NSLock用法:</p>
+<p>必须和解锁unLock方法成对出现，如 lock unlock,不能出现lock lock unlock unlock会导致死锁。</p>
+<pre><code>   
+    //主线程中
+    TestClass *obj = [[TestClass alloc] init];
+    NSLock *lock = [[NSLock alloc] init];
+
+    //线程1
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        [lock lock];
+        [obj testLog1];
+        sleep(10);
+        [lock unlock];
+    });
+
+    //线程2
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        sleep(1);
+        [lock lock];//以保证让线程2的代码后执行
+        [obj testLog2];
+        [lock unlock];
+    });</code></pre>
+
+<p>不能这么使用,否则会导致死锁： </p>
+<pre><code>dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        [lock lock];
+        [lock lock];
+        [obj testLog1];
+        sleep(10);
+        [lock unlock];
+        [lock unlock];
+    });</code></pre>
+这种情况应该使用NSRecursiveLock。递归锁会跟踪它被多少次lock。每次成功的lock都必须平衡调用unlock操作。只有所有的锁住和解锁操作都平衡的时候，锁才真正被释放给其他线程获得。
+
+<p>NSConditionLock用法：</p>
+
+<pre><code>    //主线程中
+TestClass *obj = [[TestClass alloc] init];
+    NSConditionLock *lock = [[NSConditionLock alloc] init];
+
+    //线程1
+dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        [lock lock];
+        [obj testLog1];
+        sleep(5);
+        [lock unlockWithCondition:2];
+    });
+
+    //线程2
+dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        [lock lockWhenCondition:2];
+        [obj testLog2];
+        [lock unlock];
+    });</code></pre>
+在线程1中的加锁使用了lock，所以是不需要条件的，所以顺利的就锁住了，但在unlock的使用了一个整型的条件，它可以开启其它线程中正在等待这把钥匙的临界地，而线程2则需要一把被标识为2的钥匙，所以当线程1结束时，才最终打开了线程2中的阻塞。但即便如此，NSConditionLock也跟其它的锁一样，是需要lock与unlock对应的，只是lock,lockWhenCondition:与unlock，unlockWithCondition:是可以随意组合的，当然这是与你的需求相关的
+
+<p>NSCondition用法：</p>
+1. - (void)wait  //使线程等待 阻塞当前线程，直到收到信号
+2. - (BOOL)waitUntilDate:(NSDate *)limit //阻塞当前线程，直到收到信号或到达指定的时间
+
+1. - (void)signal  //发信号给阻塞的线程  唤一个阻塞的线程
+2. - (void)broadcast  //唤醒所有阻塞的线程
+
+<pre><code>- (IBAction)fasong:(id)sender {
+    [NSThread detachNewThreadSelector:@selector(thread1) toTarget:self withObject:nil];
+}
+
+- (IBAction)jieshou:(id)sender {
+    [NSThread detachNewThreadSelector:@selector(thread2) toTarget:self withObject:nil];
+}
+
+//发送线程
+- (void)thread1
+{
+    while (1)
+    {
+        NSLog(@"thread1：等待发送");
+        [condition lock];
+        [condition wait];
+
+        NSLog(@"thread1:发送");
+        [condition unlock];
+    }
+}
+
+//接收线程
+- (void)thread2
+{
+    [condition lock];
+    NSLog(@"thread2：收到数据");
+    [condition signal];
+    [condition unlock];
+}
+</code></pre>
+
+<p>synchronized用法：</p><br>@synchronized指令使用的obj为该锁的唯一标识，只有当标识相同时，才为满足互斥，如果线程2中的@synchronized(obj)改为@synchronized(other),刚线程2就不会被阻塞，@synchronized指令实现锁的优点就是我们不需要在代码中显式的创建锁对象，便可以实现锁的机制，但作为一种预防措施，@synchronized块会隐式的添加一个异常处理例程来保护代码，该处理例程会在异常抛出的时候自动的释放互斥锁。所以如果不想让隐式的异常处理例程带来额外的开销，你可以考虑使用锁对象。<br><pre><code>TestClass *testObj = [[TestClass alloc] init];<br>//线程1<br>dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{<br>        @synchronized(testObj){<br>            [testObj testLog1];<br>            sleep(10);<br>        }<br>    });<br>//线程2<br>dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{<br>        @synchronized(testObj){<br>            sleep(1);<br>            [testObj testLog2];<br>        }<br>    });</code></pre><br><br><p>pthread_mutex_lock用法：</p>
+
+<p>从实现原理上来讲，Mutex属于sleep-waiting类型的锁。例如在一个双核的机器上有两个线程(线程A和线程B)，它们分别运行在Core0和Core1上。假设线程A想要通过pthread_mutex_lock操作去得到一个临界区的锁，而此时这个锁正被线程B所持有，那么线程A就会被阻塞(blocking)，Core0 会在此时进行上下文切换(Context Switch)将线程A置于等待队列中，此时Core0就可以运行其他的任务(例如另一个线程C)而不必进行忙等待。</p>
+<pre><code>TestClass *obj = [[TestClass alloc] init];
+    __block pthread_mutex_t mutex;
+    pthread_mutex_init(&mutex, NULL);
+
+    //线程1
+dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        pthread_mutex_lock(&mutex);
+        [obj testLog1];
+        sleep(5);
+        pthread_mutex_unlock(&mutex);
+    });
+
+    //线程2
+dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        sleep(1);
+        pthread_mutex_lock(&mutex);
+        [obj testLog2];
+        pthread_mutex_unlock(&mutex);
+    });</code></pre>
+
+
+<p></p><p>dispatch_semaphore用法：</p><p></p>
+<ol>
+<li>dispatch_semaphore_create的声明为：<br>dispatch_semaphore_t  dispatch_semaphore_create(long value);<br>　　传入的参数为long，输出一个dispatch_semaphore_t类型且值为value的信号量。值得注意的是，这里的传入的参数value必须大于或等于0，否则dispatch_semaphore_create会返回NULL。</li>
+<li>dispatch_semaphore_wait的声明为：<br>long dispatch_semaphore_wait(dispatch_semaphore_t dsema, dispatch_time_t timeout)；这个函数会使传入的信号量dsema的值减1；这个函数的作用是这样的，如果dsema信号量的值大于0，该函数所处线程就继续执行下面的语句，并且将信号量的值减1；如果desema的值为0，那么这个函数就阻塞当前线程等待timeout（注意timeout的类型为dispatch_time_t，不能直接传入整形或float型数），如果等待的期间desema的值被dispatch_semaphore_signal函数加1了，且该函数（即dispatch_semaphore_wait）所处线程获得了信号量，那么就继续向下执行并将信号量减1。如果等待期间没有获取到信号量或者信号量的值一直为0，那么等到timeout时，其所处线程自动执行其后语句。</li>
+<li>dispatch_semaphore_signal的声明为：<br>long dispatch_semaphore_signal(dispatch_semaphore_t dsema)这个函数会使传入的信号量dsema的值加1；dispatch_semaphore_signal的返回值为long类型，当返回值为0时表示当前并没有线程等待其处理的信号量，其处理的信号量的值加1即可。当返回值不为0时，表示其当前有（一个或多个）线程等待其处理的信号量，并且该函数唤醒了一个等待的线程（当线程有优先级时，唤醒优先级最高的线程；否则随机唤醒）。<br>dispatch_semaphore_wait的返回值也为long型。当其返回0时表示在timeout之前，该函数所处的线程被成功唤醒。当其返回不为0时，表示timeout发生。</li>
+<li>在设置timeout时，比较有用的两个宏：DISPATCH_TIME_NOW 和DISPATCH_TIME_FOREVER.DISPATCH_TIME_NOW　　表示当前；<br>DISPATCH_TIME_FOREVER　　表示遥远的未来；一般可以直接设置timeout为这两个宏其中的一个，或者自己创建一个dispatch_time_t类型的变量。创建dispatch_time_t类型的变量有两种方法，dispatch_time和dispatch_walltime。<br>利用创建dispatch_time创建dispatch_time_t类型变量的时候一般也会用到这两个变量。<br>dispatch_time的声明如下：<br>dispatch_time_t dispatch_time(dispatch_time_t when, int64_t delta)；其参数when需传入一个dispatch_time_t类型的变量，和一个delta值。表示when加delta时间就是timeout的时间。<br>例如：dispatch_time_t  t = dispatch_time(DISPATCH_TIME_NOW, 1<em>1000</em>1000*1000);<br>表示当前时间向后延时一秒为timeout的时间。</li>
+</ol>
+<pre><code>
+    dispatch_group_t group = dispatch_group_create();
+    dispatch_semaphore_t semaphore = dispatch_semaphore_create(1);
+    dispatch_queue_t queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
+    for (int i = 0; i < 10; i++)
+    {
+        dispatch_group_async(group, queue, ^{
+            dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
+            NSLog(@"%i",i);
+            sleep(2);
+            dispatch_semaphore_signal(semaphore);
+        });
+    }
+    dispatch_group_wait(group, DISPATCH_TIME_FOREVER);
+
+    NSLog(@"zhixing=======");</code></pre>
+
+
+<p></p><p>dispatch_barrier_async用法：</p><br>这个函数会立即返回，并不会等待block执行，这和一般的async方法没有区别。但是当这个barrier block进入这个并发的Queue的的时候，这个queue并不会立即执行，这个queue会等待正在执行的block的执行完毕再执行。所以在这点上就保证了我们的barrier block 只有它自己在执行。所有的在他之后提交的block会一直等待到这个barrier block 执行完再执行。需要特别注意的是，传入dispatch_barrier_async（）函数的queue,必须是用dispatch_queue_create 创建的并发queue。如果是串行的queue或者是global concurrent queues ,这个函数就会变成 dispatch_async（）了。<p></p>
+<pre><code>
+dispatch_queue_t queue = dispatch_queue_create("com.test", DISPATCH_QUEUE_CONCURRENT);
+dispatch_async(queue, ^(void){
+        sleep(1);
+        NSLog(@"=====ceshi1");
+        sleep(2);
+    });
+for (int i = 0; i < 10; i++)
+{
+     dispatch_barrier_async(queue, ^(void){
+            NSLog(@"=====%d", i);
+            sleep(2);
+     });
+ }
+
+NSLog(@"===========ceshi3");</code></pre>
+
+<p></p><p>性能分析：</p><p></p>
+<pre><code>
+    const NSInteger KRunTimes = 1000 * 1000;
+    double curTime, lastTime;
+
+    // 1.同步synchronized
+    id obj = [NSObject new];
+
+    lastTime = CFAbsoluteTimeGetCurrent();
+    for (NSInteger i = 0; i < KRunTimes; ++i) {
+        @synchronized(obj) {
+        }
+    }
+    curTime = CFAbsoluteTimeGetCurrent();
+    NSLog(@"@synchronized: %f ms", (curTime - lastTime) * 1000);
+
+    // 2.NSLock
+    NSLock *myLock = [NSLock new];
+
+    lastTime = CFAbsoluteTimeGetCurrent();
+    for (NSInteger i = 0; i < KRunTimes; ++i) {
+        [myLock lock];
+        [myLock unlock];
+    }
+    curTime = CFAbsoluteTimeGetCurrent();
+    NSLog(@"NSLock: %f ms", (curTime - lastTime) * 1000);
+
+    // NSLock IMP
+    typedef void (*func)(id, SEL);
+    SEL lockSEL = @selector(lock);
+    SEL unlockSEL = @selector(unlock);
+    func lockFunc = (void (*)(id, SEL))[myLock methodForSelector : lockSEL];
+    func unlockFunc = (void (*)(id, SEL))[myLock methodForSelector : unlockSEL];
+
+    lastTime = CFAbsoluteTimeGetCurrent();
+    for (NSInteger i = 0; i < KRunTimes; ++i) {
+        lockFunc(myLock, lockSEL);
+        unlockFunc(myLock, unlockSEL);
+    }
+
+    curTime = CFAbsoluteTimeGetCurrent();
+    NSLog(@"NSLock + IMP: %f ms", (curTime - lastTime) * 1000);
+
+    // 3.NSCondition
+    NSCondition *condition = [[NSCondition alloc] init];
+    lastTime = CFAbsoluteTimeGetCurrent();
+    for (NSInteger i = 0; i < KRunTimes; ++i) {
+        [condition lock];
+        [condition unlock];
+    }
+    curTime = CFAbsoluteTimeGetCurrent();
+    NSLog(@"NSCondition: %f ms", (curTime - lastTime) * 1000);
+
+    // 4.NSConditionLock
+    NSConditionLock *conditionLock = [[NSConditionLock alloc] init];
+    lastTime = CFAbsoluteTimeGetCurrent();
+    for (NSInteger i = 0; i < KRunTimes; ++i) {
+        [conditionLock lock];
+        [conditionLock unlock];
+    }
+    curTime = CFAbsoluteTimeGetCurrent();
+    NSLog(@"NSConditionLock: %f ms", (curTime - lastTime) * 1000);
+
+    // 5.NSRecursiveLock
+    NSRecursiveLock *recursiveLock = [[NSRecursiveLock alloc] init];
+    lastTime = CFAbsoluteTimeGetCurrent();
+    for (NSInteger i = 0; i < KRunTimes; ++i) {
+        [recursiveLock lock];
+        [recursiveLock unlock];
+    }
+    curTime = CFAbsoluteTimeGetCurrent();
+    NSLog(@"NSRecursiveLock: %f ms", (curTime - lastTime) * 1000);
+
+    // 6.pthread_mutex_t
+    pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    lastTime = CFAbsoluteTimeGetCurrent();
+    for (NSInteger i = 0; i < KRunTimes; ++i) {
+        pthread_mutex_lock(&mutex);
+        pthread_mutex_unlock(&mutex);
+    }
+
+    curTime = CFAbsoluteTimeGetCurrent();
+    NSLog(@"pthread_mutex: %f ms", (curTime - lastTime) * 1000);
+    pthread_mutex_destroy(&mutex);
+
+    // 7.OSSpinLock 自旋锁;
+    OSSpinLock spinlock = OS_SPINLOCK_INIT;
+    lastTime = CFAbsoluteTimeGetCurrent();
+    for (NSInteger i = 0; i < KRunTimes; ++i) {
+        OSSpinLockLock(&spinlock);
+        OSSpinLockUnlock(&spinlock);
+    }
+
+    curTime = CFAbsoluteTimeGetCurrent();
+    NSLog(@"OSSpinlock: %f ms", (curTime - lastTime) * 1000);
+
+    // 8 dispatch_barrier_async
+    dispatch_queue_t queue =
+    dispatch_queue_create("com.qq.ksnow", DISPATCH_QUEUE_CONCURRENT);
+
+    lastTime   = CFAbsoluteTimeGetCurrent();
+    for (NSInteger i = 0; i < KRunTimes; ++i) {
+        dispatch_barrier_async(queue, ^{});
+    }
+    curTime = CFAbsoluteTimeGetCurrent();
+    NSLog(@"@dispatch_barrier_async: %f ms", (curTime - lastTime) * 1000);</code></pre>
+
+<p>  所耗的时间如下:<br>  <pre><code>2016-06-09 17:01:30.987 TestGCD[13354:537542] @synchronized: 207.141995 ms<br>2016-06-09 17:01:31.037 TestGCD[13354:537542] NSLock: 49.056053 ms<br>2016-06-09 17:01:31.076 TestGCD[13354:537542] NSLock + IMP: 39.246976 ms<br>2016-06-09 17:01:31.114 TestGCD[13354:537542] NSCondition: 37.796974 ms<br>2016-06-09 17:01:31.222 TestGCD[13354:537542] NSConditionLock: 107.953012 ms<br>2016-06-09 17:01:31.275 TestGCD[13354:537542] NSRecursiveLock: 52.785993 ms<br>2016-06-09 17:01:31.301 TestGCD[13354:537542] pthread_mutex: 25.191009 ms<br>2016-06-09 17:01:31.312 TestGCD[13354:537542] OSSpinlock: 11.332035 ms<br>2016-06-09 17:01:32.469 TestGCD[13354:537542] @dispatch_barrier_async: 1156.529009 ms</code></pre></p>
+<p>从上可以看出：性能最高的诶OSSpinlock，其次是pthread_mutex，最差的为dispatch_barrier_async，其次是@synchronized。不过不少网站已爆出OSSpinlock苹果方面的bug，并且会一直处于忙等待中占用较多的CPU资源，所以不建议使用。直接使用底层pthread_mutex即可。</p>
+<p></p><p>原因分析：</p><p></p>
+<ol>
+<li>synchronized:会创建一个异常捕获handler和一些内部的锁。所以，使用@synchronized替换普通锁的代价是，你付出更多的时间消耗。</li>
+<li>NSConditionLock:条件锁，与特定的，用户定义的条件有关。可以确保一个线程可以获取满足一定条件的锁。内部会涉及到信号量机制，一旦一个线程获得锁后，它可以放弃锁并设置相关条件;其它线程竞争该锁。线程之间的竞争激烈，涉及到条件锁检测，线程间通信。系统调用，上下切换方切换比较频繁。</li>
+<li>pthread_mutex：底层的API还是性能比较高啊，在各种同步对象中，性能属于佼佼者。建议使用。</li>
+<li>OSSpinLock：首先要提的是OSSpinLock已经出现了BUG，导致并不能完全保证是线程安全的。</li>
+</ol>
+<p>新版 iOS 中，系统维护了 5 个不同的线程优先级/QoS: background，utility，default，user-initiated，user-interactive。高优先级线程始终会在低优先级线程前执行，一个线程不会受到比它更低优先级线程的干扰。这种线程调度算法会产生潜在的优先级反转问题，从而破坏了 spin lock。<br>具体来说，如果一个低优先级的线程获得锁并访问共享资源，这时一个高优先级的线程也尝试获得这个锁，它会处于 spin lock 的忙等状态从而占用大量 CPU。此时低优先级线程无法与高优先级线程争夺 CPU 时间，从而导致任务迟迟完不成、无法释放 lock。这并不只是理论上的问题，libobjc 已经遇到了很多次这个问题了，于是苹果的工程师停用了 OSSpinLock。<br>苹果工程师 Greg Parker 提到，对于这个问题，一种解决方案是用 truly unbounded backoff 算法，这能避免 livelock 问题，但如果系统负载高时，它仍有可能将高优先级的线程阻塞数十秒之久；另一种方案是使用 handoff lock 算法，这也是 libobjc 目前正在使用的。锁的持有者会把线程 ID 保存到锁内部，锁的等待者会临时贡献出它的优先级来避免优先级反转的问题。理论上这种模式会在比较复杂的多锁条件下产生问题，但实践上目前还一切都好。<br>OSSpinLock 自旋锁，性能最高的锁。原理很简单，就是一直 do while 忙等。它的缺点是当等待时会消耗大量 CPU 资源，所以它不适用于较长时间的任务。对于内存缓存的存取来说，它非常合适。<br>-摘自ibireme</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://yoursite.com/2016/05/20/lock比较/" data-id="cip89bzyj0004k3zx1nl1zulq" class="article-share-link">Partager</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-copy" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2016/04/24/copy/" class="article-date">
@@ -206,7 +540,7 @@ NSLog(@"Name: %@", userEntity.name);
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cio8c6yj9000022zxpuwdpyrz" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/24/copy/" data-id="cip89bzyh0003k3zxt64h9cgx" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/copy/">copy</a></li></ul>
@@ -927,8 +1261,8 @@ _Block_object_assign((void*)&dst->weakSelf, (void*)src->weakSelf, 8/*BLOCK_FIELD
      _Block_byref_assign_copy(destAddr, object, flags);
  }
 }</code></pre></li>
-<li><p>执行<pre><code>static void _Block_byref_assign_copy(void <em>dest, const void </em>arg, const int flags) {<br> struct Block_byref <strong>destp = (struct Block_byref </strong>)dest;<br> struct Block_byref <em>src = (struct Block_byref </em>)arg;</code></pre></p>
-<p> else if ((src-&gt;forwarding-&gt;flags &amp; BLOCK_REFCOUNT_MASK) == 0) {</p>
+<li><p>执行<br><pre><code>static void _Block_byref_assign_copy(void <em>dest, const void </em>arg, const int flags)<br>{<br> struct Block_byref <strong>destp = (struct Block_byref </strong>)dest;<br> struct Block_byref <em>src = (struct Block_byref </em>)arg;</code></pre></p>
+<p> else if ((src-&gt;forwarding-&gt;flags &amp; BLOCK_REFCOUNT_MASK) == 0)<br> {</p>
 <pre><code>//printf(&quot;making copy\n&quot;);
 // src points to stack
 bool isWeak = ((flags &amp; (BLOCK_FIELD_IS_BYREF|BLOCK_FIELD_IS_WEAK)) == (BLOCK_FIELD_IS_BYREF|BLOCK_FIELD_IS_WEAK));
@@ -948,7 +1282,7 @@ if (src-&gt;flags &amp; BLOCK_HAS_COPY_DISPOSE) {
     copy-&gt;byref_destroy = src-&gt;byref_destroy;
     (*src-&gt;byref_keep)(copy, src);
 }
-</code></pre><p> }<br> 其中最后(<em>src-&gt;byref_keep)(copy, src);即为：<strong>Block_byref_id_object_copy_131，static void </strong>Block_byref_id_object_copy_131(void </em>dst, void <em>src) {<br>// 4个指针加上2个int 4</em>8+2<em>4=40即__Block_byref_weakSelf_0中的person对象 131即为BLOCK_FIELD_IS_OBJECT|BLOCK_BYREF_CALLE<br>_Block_object_assign((char</em>)dst + 40, <em>(void </em> <em>) ((char</em>)src + 40), 131);<br>}</p>
+</code></pre><p> }<br> 其中最后(<em>src-&gt;byref_keep)(copy, src);即为：<strong>Block_byref_id_object_copy_131，static void </strong>Block_byref_id_object_copy_131(void </em>dst, void <em>src) {<br>// 4个指针加上2个int 4</em>8+2<em>4=40即__Block_byref_weakSelf_0中的person对象 131即为BLOCK_FIELD_IS_OBJECT|BLOCK_BYREF_CALLE<br>_Block_object_assign((char</em>)dst + 40, <em>(void </em> <em>) ((char</em>)src + 40), 131);}</p>
 </li>
 <li>查看runTime.h<br><pre><code>void _Block_object_assign(void <em>destAddr, const void </em>object, const int flags) {<br> //printf(“_Block_object_assign(*%p, %p, %x)\n”, destAddr, object, flags);<br> if ((flags &amp; BLOCK_BYREF_CALLER) == BLOCK_BYREF_CALLER) {<pre><code>if ((flags &amp; BLOCK_FIELD_IS_WEAK) == BLOCK_FIELD_IS_WEAK) {
     _Block_assign_weak(object, destAddr);
@@ -963,7 +1297,7 @@ else {
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/Block/" data-id="cio8c6yjg000122zxnjw22jit" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/Block/" data-id="cip89bzyb0001k3zxuab18zk9" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/block/">block</a></li></ul>
@@ -1314,7 +1648,7 @@ else {
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/TextAndImage/" data-id="cio8c6yjs000622zxajdclsr6" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/TextAndImage/" data-id="cip89bzyl0006k3zx64x9bmo5" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/NSMutableAttributedString/">NSMutableAttributedString</a></li></ul>
@@ -1472,7 +1806,7 @@ void myFunction()
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/HeapAndStack/" data-id="cio8c6yjm000322zx4i4kn7ar" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/HeapAndStack/" data-id="cip89bzy60000k3zx09730s12" class="article-share-link">Partager</a>
       
       
   <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/堆栈/">堆栈</a></li></ul>
@@ -1520,7 +1854,7 @@ void myFunction()
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://yoursite.com/2016/04/18/hello-world/" data-id="cio8c6yjp000422zxnofd1u6k" class="article-share-link">Partager</a>
+      <a data-url="http://yoursite.com/2016/04/18/hello-world/" data-id="cip89bzz6000dk3zxxoa8bogc" class="article-share-link">Partager</a>
       
       
     </footer>
@@ -1561,7 +1895,7 @@ void myFunction()
   <div class="widget-wrap">
     <h3 class="widget-title">Archives</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/04/">April 2016</a></li></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/05/">May 2016</a></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/04/">April 2016</a></li></ul>
     </div>
   </div>
 
@@ -1572,6 +1906,10 @@ void myFunction()
     <h3 class="widget-title">Articles récents</h3>
     <div class="widget">
       <ul>
+        
+          <li>
+            <a href="/2016/05/20/lock比较/">lock比较</a>
+          </li>
         
           <li>
             <a href="/2016/04/24/copy/">copy与mutableCopy的内存管理剖析</a>
@@ -1587,10 +1925,6 @@ void myFunction()
         
           <li>
             <a href="/2016/04/18/HeapAndStack/">深度剖析堆栈</a>
-          </li>
-        
-          <li>
-            <a href="/2016/04/18/hello-world/">Hello World</a>
           </li>
         
       </ul>
